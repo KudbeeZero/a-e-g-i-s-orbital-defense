@@ -28,7 +28,7 @@ export interface Threat {
   id: string;
   position: [number, number, number];
   velocity: [number, number, number];
-  type: "debris" | "asteroid" | "missile" | "armored";
+  type: "debris" | "asteroid" | "missile" | "armored" | "icbm";
   speed: number;
   hp: number;
   maxHp: number;
