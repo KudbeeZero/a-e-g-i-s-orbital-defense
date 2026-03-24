@@ -209,8 +209,8 @@ export default function CombatScreen() {
   // Edge indicator projection loop — shows ALL threats for early warning
   useEffect(() => {
     let rafId: number;
-    const cam = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-    cam.position.set(0, 0, 5.5);
+    const cam = new THREE.PerspectiveCamera(65, 1, 0.1, 1000);
+    cam.position.set(0, 1.5, 6.5);
     cam.lookAt(0, 0, 0);
 
     const update = () => {
@@ -299,12 +299,12 @@ export default function CombatScreen() {
       setTimeout(() => setLockRing(null), 700);
 
       const camera = new THREE.PerspectiveCamera(
-        75,
+        65,
         rect.width / rect.height,
         0.1,
         1000,
       );
-      camera.position.set(0, 0, 5.5);
+      camera.position.set(0, 1.5, 6.5);
       camera.lookAt(0, 0, 0);
       camera.updateProjectionMatrix();
 
@@ -514,7 +514,8 @@ export default function CombatScreen() {
       `}</style>
 
       <Canvas
-        camera={{ position: [0, 0, 5.5], fov: 75 }}
+        camera={{ position: [0, 1.5, 6.5], fov: 65 }}
+        onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
         style={{ width: "100%", height: "100%" }}
         gl={{ antialias: true, alpha: false }}
       >
