@@ -83,6 +83,58 @@ function createEarthTexture(): THREE.CanvasTexture {
   return new THREE.CanvasTexture(canvas);
 }
 
+function createNightTexture(): THREE.CanvasTexture {
+  const size = 1024;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+
+  // Deep dark base — space-lit Earth at night
+  ctx.fillStyle = "#010308";
+  ctx.fillRect(0, 0, size, size);
+
+  // City light clusters mapped to approximate continent positions
+  const clusters = [
+    { x: 220, y: 255, rx: 90, ry: 45, count: 80, bright: 0.85 },  // North America East
+    { x: 178, y: 258, rx: 60, ry: 35, count: 55, bright: 0.65 },  // North America West
+    { x: 510, y: 230, rx: 80, ry: 38, count: 90, bright: 0.90 },  // Western Europe
+    { x: 565, y: 255, rx: 45, ry: 30, count: 40, bright: 0.60 },  // Middle East
+    { x: 690, y: 240, rx: 90, ry: 50, count: 95, bright: 0.95 },  // East Asia
+    { x: 640, y: 295, rx: 55, ry: 35, count: 50, bright: 0.55 },  // South Asia
+    { x: 315, y: 435, rx: 45, ry: 60, count: 35, bright: 0.40 },  // South America
+    { x: 530, y: 360, rx: 40, ry: 55, count: 25, bright: 0.30 },  // Sub-Saharan Africa
+    { x: 760, y: 455, rx: 50, ry: 30, count: 45, bright: 0.55 },  // Australia
+    { x: 385, y: 165, rx: 40, ry: 28, count: 30, bright: 0.50 },  // Greenland/Canada
+  ];
+
+  for (const cl of clusters) {
+    for (let i = 0; i < cl.count; i++) {
+      // Distribute within ellipse
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.sqrt(Math.random());
+      const lx = cl.x + Math.cos(angle) * dist * cl.rx;
+      const ly = cl.y + Math.sin(angle) * dist * cl.ry;
+      const r = 1.5 + Math.random() * 2.5;
+      const alpha = cl.bright * (0.5 + Math.random() * 0.5);
+      const warmth = Math.random();
+      const cr = Math.floor(240 + warmth * 15);
+      const cg = Math.floor(200 + warmth * 20);
+      const cb = Math.floor(100 + warmth * 80);
+      const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, r * 3.5);
+      grad.addColorStop(0, `rgba(${cr},${cg},${cb},${alpha})`);
+      grad.addColorStop(0.5, `rgba(${cr},${cg},${cb},${alpha * 0.4})`);
+      grad.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(lx, ly, r * 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  return new THREE.CanvasTexture(canvas);
+}
+
 function latLonToLocal(lat: number, lon: number): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
   const theta = (lon + 180) * (Math.PI / 180);
@@ -283,6 +335,63 @@ function SmokeTrail({
   );
 }
 
+const ATMOSPHERE_VERT = `
+  varying vec3 vNormal;
+  varying vec3 vWorldPosition;
+  void main() {
+    vNormal = normalize(normalMatrix * normal);
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPos.xyz;
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+const ATMOSPHERE_FRAG = `
+  varying vec3 vNormal;
+  varying vec3 vWorldPosition;
+  uniform vec3 uCameraPos;
+  void main() {
+    vec3 viewDir = normalize(uCameraPos - vWorldPosition);
+    float fresnel = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 3.0);
+    vec3 innerColor = vec3(0.15, 0.55, 1.0);
+    vec3 outerColor = vec3(0.05, 0.25, 0.8);
+    vec3 color = mix(innerColor, outerColor, fresnel);
+    float intensity = fresnel * 0.85;
+    gl_FragColor = vec4(color * intensity, intensity);
+  }
+`;
+
+function AtmosphereShader({ radius }: { radius: number }) {
+  const { camera } = useThree();
+
+  const atmosphereMat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: ATMOSPHERE_VERT,
+        fragmentShader: ATMOSPHERE_FRAG,
+        uniforms: {
+          uCameraPos: { value: new THREE.Vector3() },
+        },
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.FrontSide,
+      }),
+    [],
+  );
+
+  useFrame(() => {
+    atmosphereMat.uniforms.uCameraPos.value.copy(camera.position);
+  });
+
+  return (
+    <mesh>
+      <sphereGeometry args={[radius * 1.15, 128, 128]} />
+      <primitive object={atmosphereMat} attach="material" />
+    </mesh>
+  );
+}
+
 function ThreatMeshInner({ threat }: { threat: Threat }) {
   const spriteRef = useRef<THREE.Sprite>(null);
   const rotationRef = useRef(0);
@@ -336,8 +445,8 @@ function ThreatMeshInner({ threat }: { threat: Threat }) {
         />
       )}
       <SmokeTrail points={trailRef.current} color={trailColor} />
-      <sprite ref={spriteRef} scale={spriteScale}>
-        <spriteMaterial map={enemyTexture} color={color} />
+      <sprite ref={spriteRef} scale={spriteScale} renderOrder={10}>
+        <spriteMaterial map={enemyTexture} color={color} depthTest />
       </sprite>
       {isLocked && (
         <mesh
@@ -735,6 +844,8 @@ export default function EarthScene({
 }: { onThreatClick: (threatId: string) => void }) {
   const earthGroupRef = useRef<THREE.Group>(null);
   const cloudsRef = useRef<THREE.Mesh>(null);
+  const cineTimeRef = useRef(0);
+  const shakeVecRef = useRef(new THREE.Vector3());
   const { camera } = useThree();
 
   const threats = useGameStore((s) => s.threats);
@@ -763,6 +874,7 @@ export default function EarthScene({
   const paused = useGameStore((s) => s.paused);
 
   const earthTexture = useMemo(() => createEarthTexture(), []);
+  const nightTexture = useMemo(() => createNightTexture(), []);
   const slowMoTriggeredThreats = useRef(new Set<string>());
   const slowMoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nearMissedThreats = useRef(new Set<string>());
@@ -784,25 +896,35 @@ export default function EarthScene({
   }, [wave]);
 
   useFrame((_state, delta) => {
+    // --- Cinematic camera (always runs, even when paused) ---
+    cineTimeRef.current += delta;
+    const t = cineTimeRef.current;
+    const baseCamX = Math.sin(t * 0.1) * 0.5;
+    const baseCamY = 2 + Math.sin(t * 0.07) * 0.2;
+    const baseCamZ = 8 + Math.sin(t * 0.05) * 0.3;
+
+    const currentHull = useGameStore.getState().hull;
+    if (cameraShake > 0 && currentHull > 0) {
+      const shakeAmount = cameraShake * 0.05;
+      shakeVecRef.current.x = (Math.random() - 0.5) * shakeAmount;
+      shakeVecRef.current.y = (Math.random() - 0.5) * shakeAmount;
+      setCameraShake(Math.max(0, cameraShake - 0.15));
+    } else {
+      shakeVecRef.current.x *= 0.9;
+      shakeVecRef.current.y *= 0.9;
+    }
+    camera.position.x = baseCamX + shakeVecRef.current.x;
+    camera.position.y = baseCamY + shakeVecRef.current.y;
+    camera.position.z = baseCamZ;
+    camera.lookAt(0, 0, 0);
+
     if (paused) return;
     const scaledDelta = delta * timeScale;
 
     if (earthGroupRef.current)
-      earthGroupRef.current.rotation.y += 0.001 * scaledDelta * 60;
+      earthGroupRef.current.rotation.y += 0.0004 * scaledDelta * 60;
     if (cloudsRef.current)
-      cloudsRef.current.rotation.y += 0.0013 * scaledDelta * 60;
-
-    // Only apply camera shake while game is active (hull > 0)
-    const currentHull = useGameStore.getState().hull;
-    if (cameraShake > 0 && currentHull > 0) {
-      const shakeAmount = cameraShake * 0.05;
-      camera.position.x = (Math.random() - 0.5) * shakeAmount;
-      camera.position.y = (Math.random() - 0.5) * shakeAmount;
-      setCameraShake(Math.max(0, cameraShake - 0.15));
-    } else {
-      camera.position.x *= 0.9;
-      camera.position.y *= 0.9;
-    }
+      cloudsRef.current.rotation.y += 0.0007 * scaledDelta * 60;
 
     if (lastKillTimeRef.current > 0 && comboRef.current > 0) {
       if (Date.now() - lastKillTimeRef.current > 3000) {
@@ -930,8 +1052,21 @@ export default function EarthScene({
   };
 
   const starPositions = useMemo(() => {
-    const arr = new Float32Array(2000 * 3);
-    for (let i = 0; i < 2000; i++) {
+    const arr = new Float32Array(3000 * 3);
+    for (let i = 0; i < 3000; i++) {
+      const r = 38 + Math.random() * 25;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      arr[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      arr[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      arr[i * 3 + 2] = r * Math.cos(phi);
+    }
+    return arr;
+  }, []);
+
+  const brightStarPositions = useMemo(() => {
+    const arr = new Float32Array(250 * 3);
+    for (let i = 0; i < 250; i++) {
       const r = 40 + Math.random() * 20;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
@@ -944,6 +1079,7 @@ export default function EarthScene({
 
   return (
     <>
+      {/* Background starfield — dim layer */}
       <points>
         <bufferGeometry>
           <bufferAttribute
@@ -951,20 +1087,49 @@ export default function EarthScene({
             args={[starPositions, 3]}
           />
         </bufferGeometry>
-        <pointsMaterial color="#aaccff" size={0.06} sizeAttenuation />
+        <pointsMaterial
+          color="#cce0ff"
+          size={0.05}
+          sizeAttenuation
+          transparent
+          opacity={0.75}
+        />
       </points>
 
-      <ambientLight intensity={0.3} />
-      <directionalLight position={[5, 3, 5]} intensity={1.2} color="#fff5e0" />
-      <pointLight position={[-5, -3, -5]} intensity={0.1} color="#1a3a8a" />
+      {/* Bright accent stars */}
+      <points>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            args={[brightStarPositions, 3]}
+          />
+        </bufferGeometry>
+        <pointsMaterial
+          color="#ffffff"
+          size={0.13}
+          sizeAttenuation
+          transparent
+          opacity={0.9}
+        />
+      </points>
+
+      {/* Sun — primary directional light */}
+      <directionalLight position={[5, 3, 5]} intensity={1.6} color="#ffffff" />
+      {/* Ambient — deep space fill */}
+      <ambientLight color="#404060" intensity={0.5} />
+      {/* Rim light — cool back-scatter */}
+      <directionalLight position={[-5, -2, -5]} intensity={0.6} color="#66ccff" />
 
       <group ref={earthGroupRef}>
-        <mesh>
-          <sphereGeometry args={[2, 64, 64]} />
-          <meshPhongMaterial
+        <mesh renderOrder={1}>
+          <sphereGeometry args={[2, 128, 128]} />
+          <meshStandardMaterial
             map={earthTexture}
-            specular={new THREE.Color("#224488")}
-            shininess={15}
+            emissiveMap={nightTexture}
+            emissive="#ffffff"
+            emissiveIntensity={1.0}
+            roughness={0.85}
+            metalness={0.1}
           />
         </mesh>
         {cities.map((city) => (
@@ -972,23 +1137,16 @@ export default function EarthScene({
         ))}
       </group>
 
-      <mesh>
-        <sphereGeometry args={[2.15, 32, 32]} />
-        <meshBasicMaterial
-          color="#4488ff"
-          transparent
-          opacity={0.12}
-          side={THREE.BackSide}
-          depthWrite={false}
-        />
-      </mesh>
+      {/* Cinematic Fresnel atmosphere */}
+      <AtmosphereShader radius={2} />
 
+      {/* Cloud layer */}
       <mesh ref={cloudsRef}>
-        <sphereGeometry args={[2.05, 32, 32]} />
-        <meshBasicMaterial
+        <sphereGeometry args={[2.05, 64, 64]} />
+        <meshStandardMaterial
           color="white"
           transparent
-          opacity={0.18}
+          opacity={0.35}
           depthWrite={false}
         />
       </mesh>
