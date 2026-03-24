@@ -5,6 +5,14 @@ import { ASSETS } from "../assets";
 import { useGameStore } from "../store/gameStore";
 import type { City, Missile, Threat } from "../store/gameStore";
 
+interface AircraftState {
+  orbitAngle: number;
+  orbitHeight: number;
+  orbitSpeed: number;
+  orbitTimer: number;
+  divingToCity: boolean;
+}
+
 function createEarthTexture(): THREE.CanvasTexture {
   const size = 1024;
   const canvas = document.createElement("canvas");
@@ -164,6 +172,8 @@ function CityMesh({ city, missileCount }: { city: City; missileCount: number }) 
   const lightRefs = useRef<(THREE.Mesh | null)[]>([]);
   const siloRef = useRef<THREE.Mesh>(null);
   const flashRef = useRef<THREE.Mesh>(null);
+  const domeRef = useRef<THREE.Mesh>(null);
+  const domeRingRef = useRef<THREE.Mesh>(null);
   const pulseRef = useRef(0);
   const flashRef2 = useRef(0); // flash timer (seconds remaining)
   const prevMissileCount = useRef(missileCount);
@@ -215,6 +225,18 @@ function CityMesh({ city, missileCount }: { city: City; missileCount: number }) 
       if (!m) continue;
       const mat = m.material as THREE.MeshBasicMaterial;
       mat.opacity = brightness;
+    }
+
+    // Animate shield dome pulse
+    if (domeRef.current) {
+      const baseDomeOpacity = city.shields > 0 ? 0.18 : 0.05;
+      const mat = domeRef.current.material as THREE.MeshBasicMaterial;
+      mat.opacity = baseDomeOpacity + Math.sin(pulseRef.current * 0.7) * 0.03;
+    }
+    if (domeRingRef.current) {
+      const baseRingOpacity = city.shields > 0 ? 0.55 : 0.12;
+      const mat = domeRingRef.current.material as THREE.MeshBasicMaterial;
+      mat.opacity = baseRingOpacity + Math.sin(pulseRef.current * 0.9) * 0.08;
     }
 
     // Detect new missile fired → trigger launch flash
@@ -299,6 +321,34 @@ function CityMesh({ city, missileCount }: { city: City; missileCount: number }) 
           />
         </mesh>
       ))}
+
+      {/* Shield dome — oval translucent blue energy field */}
+      <mesh
+        ref={domeRef}
+        position={surfacePos}
+        quaternion={siloQuaternion}
+        scale={[1, 0.65, 1]}
+      >
+        <sphereGeometry args={[0.28, 24, 16]} />
+        <meshBasicMaterial
+          color="#0088ff"
+          transparent
+          opacity={city.shields > 0 ? 0.18 : 0.05}
+          depthWrite={false}
+          side={THREE.BackSide}
+        />
+      </mesh>
+
+      {/* Dome equator ring glow */}
+      <mesh ref={domeRingRef} position={surfacePos} quaternion={siloQuaternion}>
+        <torusGeometry args={[0.28, 0.008, 8, 40]} />
+        <meshBasicMaterial
+          color="#33aaff"
+          transparent
+          opacity={city.shields > 0 ? 0.55 : 0.12}
+          depthWrite={false}
+        />
+      </mesh>
     </group>
   );
 }
@@ -416,20 +466,25 @@ function ThreatMeshInner({ threat }: { threat: Threat }) {
   });
 
   const isIcbm = threat.type === "icbm";
+  const isAircraft = threat.type === "aircraft";
 
   const color =
     threat.type === "armored"
       ? "#ff8800"
       : threat.type === "icbm"
         ? "#ffcc00"
-        : threat.type === "missile"
-          ? "#ff4400"
-          : "#ff2200";
+        : threat.type === "aircraft"
+          ? "#00ff66"
+          : threat.type === "missile"
+            ? "#ff4400"
+            : "#ff2200";
 
-  const trailColor = isIcbm ? "#ff8800" : "#ff5500";
+  const trailColor = isIcbm ? "#ff8800" : isAircraft ? "#00cc44" : "#ff5500";
   const spriteScale: [number, number, number] = isIcbm
     ? [0.35, 0.12, 1]
-    : [0.3, 0.15, 1];
+    : isAircraft
+      ? [0.45, 0.18, 1]
+      : [0.3, 0.15, 1];
 
   const BRACKET_KEYS = ["n", "e", "s", "w"] as const;
 
@@ -441,6 +496,15 @@ function ThreatMeshInner({ threat }: { threat: Threat }) {
           color="#ff6600"
           intensity={1.5}
           distance={1.2}
+          decay={2}
+        />
+      )}
+      {isAircraft && (
+        <pointLight
+          position={[threat.position[0], threat.position[1], threat.position[2]]}
+          color="#00ff44"
+          intensity={1.2}
+          distance={1.0}
           decay={2}
         />
       )}
@@ -872,12 +936,14 @@ export default function EarthScene({
   const addNearMiss = useGameStore((s) => s.addNearMiss);
   const upgrades = useGameStore((s) => s.upgrades);
   const paused = useGameStore((s) => s.paused);
+  const damageThreat = useGameStore((s) => s.damageThreat);
 
   const earthTexture = useMemo(() => createEarthTexture(), []);
   const nightTexture = useMemo(() => createNightTexture(), []);
   const slowMoTriggeredThreats = useRef(new Set<string>());
   const slowMoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nearMissedThreats = useRef(new Set<string>());
+  const aircraftStateRef = useRef(new Map<string, AircraftState>());
   const wave = useGameStore((s) => s.wave);
   const prevWaveRef = useRef(wave);
 
@@ -938,6 +1004,57 @@ export default function EarthScene({
     for (const threat of threats) {
       const pos = new THREE.Vector3(...threat.position);
 
+      // Aircraft: orbit Earth first, then dive
+      if (threat.type === "aircraft") {
+        let aState = aircraftStateRef.current.get(threat.id);
+        if (!aState) {
+          aState = {
+            orbitAngle: Math.atan2(pos.z, pos.x),
+            orbitHeight: pos.y,
+            orbitSpeed: 0.4 + Math.random() * 0.3,
+            orbitTimer: 4 + Math.random() * 4,
+            divingToCity: false,
+          };
+          aircraftStateRef.current.set(threat.id, aState);
+        }
+
+        if (!aState.divingToCity) {
+          aState.orbitTimer -= scaledDelta;
+          aState.orbitAngle += aState.orbitSpeed * scaledDelta;
+          const r = 3.2;
+          pos.set(
+            Math.cos(aState.orbitAngle) * r,
+            aState.orbitHeight,
+            Math.sin(aState.orbitAngle) * r,
+          );
+          if (aState.orbitTimer <= 0) aState.divingToCity = true;
+        } else {
+          // Dive toward target city using standard navigation
+          let targetPoint = new THREE.Vector3(0, 0, 0);
+          if (threat.targetCityId) {
+            const tCity = cities.find((c) => c.id === threat.targetCityId);
+            if (tCity && !tCity.isDestroyed) {
+              targetPoint = cityWorldPos(tCity.lat, tCity.lon, earthRotY);
+            } else {
+              let nearest: City | undefined;
+              let nearestDist = Number.POSITIVE_INFINITY;
+              for (const c of cities) {
+                if (c.isDestroyed) continue;
+                const cwp = cityWorldPos(c.lat, c.lon, earthRotY);
+                const d = pos.distanceTo(cwp);
+                if (d < nearestDist) { nearestDist = d; nearest = c; }
+              }
+              if (nearest) targetPoint = cityWorldPos(nearest.lat, nearest.lon, earthRotY);
+            }
+          }
+          const toTarget = targetPoint.clone().sub(pos).normalize();
+          pos.addScaledVector(toTarget, threat.speed * scaledDelta);
+        }
+
+        threat.position[0] = pos.x;
+        threat.position[1] = pos.y;
+        threat.position[2] = pos.z;
+      } else {
       // Find target: if the assigned city is destroyed, retarget nearest living city
       let targetPoint = new THREE.Vector3(0, 0, 0);
       if (threat.targetCityId) {
@@ -962,6 +1079,7 @@ export default function EarthScene({
       threat.position[0] = pos.x;
       threat.position[1] = pos.y;
       threat.position[2] = pos.z;
+      }
 
       const distToPlayer = pos.distanceTo(playerPos);
       if (distToPlayer < 0.7 && !nearMissedThreats.current.has(threat.id)) {
@@ -1013,6 +1131,7 @@ export default function EarthScene({
           }
         }
         if (!hitCity) takeDamage(10, 5);
+        aircraftStateRef.current.delete(threat.id);
         removeThreat(threat.id);
       }
     }
@@ -1031,11 +1150,25 @@ export default function EarthScene({
     for (const t of threats) {
       const tp = new THREE.Vector3(...t.position);
       if (tp.distanceTo(hitPos) < hitRadius) {
-        removeThreat(t.id);
-        addScore(Math.round(100 * multiplier));
-        incrementDestroyed();
-        incrementCombo();
-        hit = true;
+        if (t.type === "aircraft" && t.hp > 1) {
+          // Aircraft requires 2 hits — damage but don't remove yet
+          damageThreat(t.id);
+          addExplosion({
+            id: `exp_${Date.now()}_${Math.random()}`,
+            position: [tp.x, tp.y, tp.z],
+            startTime: Date.now(),
+            color: "#00ff44",
+          });
+          hit = true;
+        } else {
+          aircraftStateRef.current.delete(t.id);
+          removeThreat(t.id);
+          const scoreAward = t.type === "aircraft" ? 200 : 100;
+          addScore(Math.round(scoreAward * multiplier));
+          incrementDestroyed();
+          incrementCombo();
+          hit = true;
+        }
       }
     }
 
