@@ -411,6 +411,10 @@ function MissileMeshInner({
   const removeMissile = useGameStore((s) => s.removeMissile);
   const threats = useGameStore((s) => s.threats);
   const timeScale = useGameStore((s) => s.timeScale);
+  const missileUpgrades = useGameStore((s) => s.upgrades);
+  const trailBlazerCount = missileUpgrades.filter((u) => u === "trail-blazer").length;
+  const trackBoost = 1.1 ** trailBlazerCount;
+  const missilePaused = useGameStore((s) => s.paused);
   const playerTexture = useLoader(THREE.TextureLoader, ASSETS.missilePlayer);
 
   const startPos = missile.startPos;
@@ -429,11 +433,12 @@ function MissileMeshInner({
 
   const targetVec = useMemo(() => new THREE.Vector3(...targetPos), [targetPos]);
   const isHeatSeeker = missile.weaponType === "heat-seeker";
-  const speed = missile.weaponType === "kinetic" ? 0.025 : 0.018;
+  const speed = (missile.weaponType === "kinetic" ? 0.025 : 0.018) * trackBoost;
   const velInitialized = useRef(false);
 
   useFrame((_state, delta) => {
     if (!spriteRef.current) return;
+    if (missilePaused) return;
     const scaledDelta = delta * timeScale;
 
     let currentPos: THREE.Vector3;
@@ -443,7 +448,7 @@ function MissileMeshInner({
         const dir = new THREE.Vector3(...targetPos)
           .sub(positionRef.current)
           .normalize();
-        velocityRef.current.copy(dir.multiplyScalar(0.06));
+        velocityRef.current.copy(dir.multiplyScalar(0.06 * trackBoost));
         velInitialized.current = true;
       }
 
@@ -452,13 +457,14 @@ function MissileMeshInner({
         ? new THREE.Vector3(...currentThreat.position)
         : new THREE.Vector3(...targetPos);
 
+      const missileSpeed = 0.06 * trackBoost;
       const desired = liveTarget
         .clone()
         .sub(positionRef.current)
         .normalize()
-        .multiplyScalar(0.06);
-      velocityRef.current.lerp(desired, 0.04);
-      velocityRef.current.normalize().multiplyScalar(0.06 * scaledDelta * 60);
+        .multiplyScalar(missileSpeed);
+      velocityRef.current.lerp(desired, 0.04 * trackBoost);
+      velocityRef.current.normalize().multiplyScalar(missileSpeed * scaledDelta * 60);
       positionRef.current.add(velocityRef.current);
       currentPos = positionRef.current.clone();
     } else {
@@ -743,6 +749,7 @@ export default function EarthScene({
   const cameraShake = useGameStore((s) => s.cameraShake);
   const setCameraShake = useGameStore((s) => s.setCameraShake);
   const destroyCity = useGameStore((s) => s.destroyCity);
+  const damageCity = useGameStore((s) => s.damageCity);
   const timeScale = useGameStore((s) => s.timeScale);
   const slowMoActive = useGameStore((s) => s.slowMoActive);
   const setTimeScale = useGameStore((s) => s.setTimeScale);
@@ -752,6 +759,8 @@ export default function EarthScene({
   const incrementCombo = useGameStore((s) => s.incrementCombo);
   const resetCombo = useGameStore((s) => s.resetCombo);
   const addNearMiss = useGameStore((s) => s.addNearMiss);
+  const upgrades = useGameStore((s) => s.upgrades);
+  const paused = useGameStore((s) => s.paused);
 
   const earthTexture = useMemo(() => createEarthTexture(), []);
   const slowMoTriggeredThreats = useRef(new Set<string>());
@@ -775,6 +784,7 @@ export default function EarthScene({
   }, [wave]);
 
   useFrame((_state, delta) => {
+    if (paused) return;
     const scaledDelta = delta * timeScale;
 
     if (earthGroupRef.current)
@@ -868,7 +878,7 @@ export default function EarthScene({
           if (city.isDestroyed) continue;
           const cwp = cityWorldPos(city.lat, city.lon, earthRotY);
           if (pos.distanceTo(cwp) < 0.6) {
-            destroyCity(city.id);
+            damageCity(city.id);
             setCameraShake(10);
             addExplosion({
               id: `city_exp_${Date.now()}_${Math.random()}`,
@@ -895,9 +905,10 @@ export default function EarthScene({
     const currentCombo = comboRef.current;
     const multiplier = Math.min(5, 1 + currentCombo * 0.5);
 
+    const hitRadius = upgrades.includes("bigger-bang") ? 0.75 : 0.5;
     for (const t of threats) {
       const tp = new THREE.Vector3(...t.position);
-      if (tp.distanceTo(hitPos) < 0.5) {
+      if (tp.distanceTo(hitPos) < hitRadius) {
         removeThreat(t.id);
         addScore(Math.round(100 * multiplier));
         incrementDestroyed();

@@ -22,6 +22,7 @@ export interface City {
   lon: number;
   isDestroyed: boolean;
   hasBurnMark: boolean;
+  shields: number;
 }
 
 export interface Threat {
@@ -61,6 +62,7 @@ const INITIAL_CITIES: City[] = [
     lon: -74.0,
     isDestroyed: false,
     hasBurnMark: false,
+    shields: 0,
   },
   {
     id: "city_ld",
@@ -69,6 +71,7 @@ const INITIAL_CITIES: City[] = [
     lon: -0.1,
     isDestroyed: false,
     hasBurnMark: false,
+    shields: 0,
   },
   {
     id: "city_tk",
@@ -77,6 +80,7 @@ const INITIAL_CITIES: City[] = [
     lon: 139.7,
     isDestroyed: false,
     hasBurnMark: false,
+    shields: 0,
   },
   {
     id: "city_sy",
@@ -85,6 +89,7 @@ const INITIAL_CITIES: City[] = [
     lon: 151.2,
     isDestroyed: false,
     hasBurnMark: false,
+    shields: 0,
   },
   {
     id: "city_mc",
@@ -93,6 +98,7 @@ const INITIAL_CITIES: City[] = [
     lon: 37.6,
     isDestroyed: false,
     hasBurnMark: false,
+    shields: 0,
   },
   {
     id: "city_bj",
@@ -101,6 +107,7 @@ const INITIAL_CITIES: City[] = [
     lon: 116.4,
     isDestroyed: false,
     hasBurnMark: false,
+    shields: 0,
   },
   {
     id: "city_sp",
@@ -109,6 +116,7 @@ const INITIAL_CITIES: City[] = [
     lon: -46.6,
     isDestroyed: false,
     hasBurnMark: false,
+    shields: 0,
   },
 ];
 
@@ -134,6 +142,7 @@ export interface GameState {
   wave: number;
   timeScale: number;
   slowMoActive: boolean;
+  paused: boolean;
   // Phase 2: combo + near-miss
   combo: number;
   maxCombo: number;
@@ -163,9 +172,11 @@ export interface GameState {
   setAmmo: (weapon: WeaponType, amount: number) => void;
   setCooldown: (weapon: WeaponType, readyAt: number) => void;
   destroyCity: (id: string) => void;
+  damageCity: (id: string) => void;
   setWave: (n: number) => void;
   setTimeScale: (v: number) => void;
   setSlowMo: (v: boolean) => void;
+  setPaused: (v: boolean) => void;
   incrementCombo: () => void;
   resetCombo: () => void;
   addNearMiss: () => void;
@@ -208,6 +219,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   wave: 1,
   timeScale: 1.0,
   slowMoActive: false,
+  paused: false,
   combo: 0,
   maxCombo: 0,
   nearMisses: 0,
@@ -234,7 +246,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   removeExplosion: (id) =>
     set((s) => ({ explosions: s.explosions.filter((e) => e.id !== id) })),
   addUpgrade: (u) => set((s) => ({ upgrades: [...s.upgrades, u] })),
-  resetCombat: () =>
+  resetCombat: () => {
+    const { upgrades } = get();
+    const ammoBoostCount = upgrades.filter((u) => u === "ammo-boost").length;
+    const ammoBonus = ammoBoostCount * 3;
+    const hasCityShield = upgrades.includes("city-shield");
     set({
       threats: [],
       missiles: [],
@@ -242,18 +258,28 @@ export const useGameStore = create<GameState>((set, get) => ({
       shield: 100,
       hull: 100,
       targetLockId: null,
-      ammo: { ...DEFAULT_AMMO },
+      ammo: {
+        "heat-seeker": DEFAULT_AMMO["heat-seeker"] + ammoBonus,
+        cluster: DEFAULT_AMMO.cluster + ammoBonus,
+        "prox-burst": DEFAULT_AMMO["prox-burst"] + ammoBonus,
+        kinetic: DEFAULT_AMMO.kinetic + ammoBonus,
+      },
       cooldowns: { ...DEFAULT_COOLDOWN },
       threatsDestroyed: 0,
       cameraShake: 0,
-      cities: INITIAL_CITIES.map((c) => ({ ...c })),
+      cities: INITIAL_CITIES.map((c) => ({
+        ...c,
+        shields: hasCityShield ? 1 : 0,
+      })),
       wave: 1,
       timeScale: 1.0,
       slowMoActive: false,
+      paused: false,
       combo: 0,
       nearMisses: 0,
       lastKillTime: 0,
-    }),
+    });
+  },
   setActiveTab: (tab) => set({ activeTab: tab }),
   setCameraShake: (v) => set({ cameraShake: v }),
   setThreatCount: (n) => set({ threatCount: n }),
@@ -293,9 +319,18 @@ export const useGameStore = create<GameState>((set, get) => ({
         c.id === id ? { ...c, isDestroyed: true, hasBurnMark: true } : c,
       ),
     })),
+  damageCity: (id) =>
+    set((s) => ({
+      cities: s.cities.map((c) => {
+        if (c.id !== id) return c;
+        if (c.shields > 0) return { ...c, shields: c.shields - 1 };
+        return { ...c, isDestroyed: true, hasBurnMark: true };
+      }),
+    })),
   setWave: (n) => set({ wave: n }),
   setTimeScale: (v) => set({ timeScale: v }),
   setSlowMo: (v) => set({ slowMoActive: v }),
+  setPaused: (v) => set({ paused: v }),
 
   incrementCombo: () =>
     set((s) => {
@@ -338,7 +373,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       progress: 0,
     });
     state.setAmmo(selectedWeapon, ammo[selectedWeapon] - 1);
-    state.setCooldown(selectedWeapon, now + WEAPON_COOLDOWNS[selectedWeapon]);
+    const reloadCount = state.upgrades.filter((u) => u === "rapid-reload").length;
+    const reloadMult = 0.7 ** reloadCount;
+    state.setCooldown(selectedWeapon, now + WEAPON_COOLDOWNS[selectedWeapon] * reloadMult);
     state.setCameraShake(3);
     state.setTargetLock(null);
     return true;

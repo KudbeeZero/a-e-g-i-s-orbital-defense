@@ -23,6 +23,20 @@ const UPGRADES = [
     desc: "-30% cooldown on all weapon systems. Sustained fire capability.",
     color: "#00e5ff",
   },
+  {
+    id: "ammo-boost",
+    name: "AMMO BOOST",
+    icon: "🎯",
+    desc: "+3 rounds for all weapon systems. Extended engagement capability.",
+    color: "#00ff88",
+  },
+  {
+    id: "city-shield",
+    name: "CITY SHIELD",
+    icon: "🛡",
+    desc: "Surviving cities gain emergency shields. Each city absorbs one extra hit.",
+    color: "#aa44ff",
+  },
 ];
 
 const STARS = Array.from({ length: 150 }, (_, i) => ({
