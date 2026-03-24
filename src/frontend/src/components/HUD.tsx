@@ -162,6 +162,7 @@ export default function HUD() {
   const cooldownLeft = Math.max(0, (cooldowns[selectedWeapon] - now) / 1000);
   const weaponColor = WEAPON_COLORS[selectedWeapon];
   const citiesIntact = cities.filter((c) => !c.isDestroyed).length;
+  const citiesShielded = cities.filter((c) => !c.isDestroyed && c.shields > 0).length;
 
   return (
     <div
@@ -505,6 +506,14 @@ export default function HUD() {
           >
             {citiesIntact}/7
           </div>
+          {citiesShielded > 0 && (
+            <div
+              className="text-xs"
+              style={{ color: "#aa44ff", fontSize: "9px", marginTop: "2px" }}
+            >
+              {citiesShielded} SHIELDED
+            </div>
+          )}
         </div>
         {nearMisses > 0 && (
           <div
@@ -641,6 +650,7 @@ export default function HUD() {
             ["TAB", "TARGET"],
             ["SPC", "FIRE"],
             ["ESC", "CLEAR"],
+            ["P", "PAUSE"],
           ] as [string, string][]
         ).map(([key, label]) => (
           <div

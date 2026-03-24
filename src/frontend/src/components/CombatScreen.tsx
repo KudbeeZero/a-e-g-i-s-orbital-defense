@@ -108,6 +108,8 @@ export default function CombatScreen() {
   const setSelectedWeapon = useGameStore((s) => s.setSelectedWeapon);
   const setTimeScale = useGameStore((s) => s.setTimeScale);
   const setSlowMo = useGameStore((s) => s.setSlowMo);
+  const paused = useGameStore((s) => s.paused);
+  const setPaused = useGameStore((s) => s.setPaused);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const [lockRing, setLockRing] = useState<LockRing | null>(null);
@@ -385,11 +387,15 @@ export default function CombatScreen() {
         case "Escape":
           setTargetLock(null);
           break;
+        case "p":
+        case "P":
+          setPaused(!useGameStore.getState().paused);
+          break;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [setTargetLock, attemptFire, setSelectedWeapon]);
+  }, [setTargetLock, attemptFire, setSelectedWeapon, setPaused]);
 
   if (isPortrait) {
     return (
@@ -663,6 +669,46 @@ export default function CombatScreen() {
               />
             ),
           )}
+        </div>
+      )}
+
+      {paused && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.65)",
+            zIndex: 50,
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "42px",
+              fontWeight: 900,
+              letterSpacing: "0.5em",
+              color: "#00e5ff",
+              textShadow: "0 0 24px rgba(0,229,255,0.7)",
+            }}
+          >
+            PAUSED
+          </div>
+          <div
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "11px",
+              letterSpacing: "0.3em",
+              color: "rgba(0,229,255,0.4)",
+              marginTop: "12px",
+            }}
+          >
+            PRESS [P] TO RESUME
+          </div>
         </div>
       )}
 
