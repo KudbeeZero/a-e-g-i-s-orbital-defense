@@ -1,0 +1,211 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* JetBrains Mono - Monospace HUD font */
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/fonts/JetBrainsMono.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/* Bricolage Grotesque - Display font */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/assets/fonts/BricolageGrotesque.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.125rem;
+    --background: 0.08 0.01 240;
+    --foreground: 0.92 0.05 195;
+    --card: 0.12 0.02 240;
+    --card-foreground: 0.92 0.05 195;
+    --popover: 0.1 0.015 240;
+    --popover-foreground: 0.92 0.05 195;
+    --primary: 0.85 0.18 195;
+    --primary-foreground: 0.08 0.01 240;
+    --secondary: 0.25 0.04 240;
+    --secondary-foreground: 0.85 0.18 195;
+    --muted: 0.15 0.02 240;
+    --muted-foreground: 0.5 0.05 240;
+    --accent: 0.8 0.18 75;
+    --accent-foreground: 0.08 0.01 240;
+    --destructive: 0.65 0.22 25;
+    --destructive-foreground: 0.985 0 0;
+    --border: 0.25 0.06 195;
+    --input: 0.2 0.04 240;
+    --ring: 0.85 0.18 195;
+    --chart-1: 0.85 0.18 195;
+    --chart-2: 0.8 0.18 75;
+    --chart-3: 0.7 0.18 145;
+    --chart-4: 0.65 0.22 25;
+    --chart-5: 0.75 0.15 300;
+    --sidebar: 0.1 0.015 240;
+    --sidebar-foreground: 0.92 0.05 195;
+    --sidebar-primary: 0.85 0.18 195;
+    --sidebar-primary-foreground: 0.08 0.01 240;
+    --sidebar-accent: 0.25 0.04 240;
+    --sidebar-accent-foreground: 0.85 0.18 195;
+    --sidebar-border: 0.25 0.06 195;
+    --sidebar-ring: 0.85 0.18 195;
+    /* Game-specific tokens */
+    --cyan: #00e5ff;
+    --amber: #ffaa00;
+    --danger: #ff3333;
+    --success: #00ff88;
+    --purple: #aa44ff;
+  }
+
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "JetBrains Mono", monospace;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000010;
+  }
+
+  #root {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+}
+
+/* AEGIS-specific utility classes */
+@layer utilities {
+  .font-hud {
+    font-family: "JetBrains Mono", monospace;
+  }
+  .font-display {
+    font-family: "Bricolage Grotesque", "JetBrains Mono", monospace;
+  }
+  .glow-cyan {
+    box-shadow: 0 0 8px #00e5ff, 0 0 20px rgba(0, 229, 255, 0.3);
+  }
+  .glow-amber {
+    box-shadow: 0 0 8px #ffaa00, 0 0 20px rgba(255, 170, 0, 0.3);
+  }
+  .glow-danger {
+    box-shadow: 0 0 8px #ff3333, 0 0 20px rgba(255, 51, 51, 0.3);
+  }
+  .text-glow-cyan {
+    text-shadow: 0 0 8px #00e5ff, 0 0 16px rgba(0, 229, 255, 0.5);
+  }
+  .text-glow-amber {
+    text-shadow: 0 0 8px #ffaa00, 0 0 16px rgba(255, 170, 0, 0.5);
+  }
+  .border-glow-cyan {
+    border-color: #00e5ff;
+    box-shadow: 0 0 6px rgba(0, 229, 255, 0.4), inset 0 0 6px
+      rgba(0, 229, 255, 0.05);
+  }
+}
+
+/* Scanline effect overlay */
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 229, 255, 0.02) 2px,
+    rgba(0, 229, 255, 0.02) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Pulse animation for targeting reticle */
+@keyframes reticle-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes amber-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 8px #ffaa00, 0 0 20px rgba(255, 170, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px #ffaa00, 0 0 40px rgba(255, 170, 0, 0.6);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glitch {
+  0%,
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+  }
+  20% {
+    clip-path: inset(10% 0 60% 0);
+    transform: translateX(-3px);
+  }
+  40% {
+    clip-path: inset(50% 0 20% 0);
+    transform: translateX(3px);
+  }
+  60% {
+    clip-path: inset(30% 0 40% 0);
+    transform: translateX(-2px);
+  }
+  80% {
+    clip-path: inset(70% 0 10% 0);
+    transform: translateX(2px);
+  }
+}
+
+@keyframes starfield-twinkle {
+  0%,
+  100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.animate-pulse-amber {
+  animation: amber-pulse 1.5s ease-in-out infinite;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
+.animate-glitch {
+  animation: glitch 0.3s steps(1) infinite;
+}
