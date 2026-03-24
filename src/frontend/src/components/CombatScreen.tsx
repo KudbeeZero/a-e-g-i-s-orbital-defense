@@ -52,6 +52,23 @@ function createThreat(
   };
 }
 
+// Aircraft threats spawn in low orbit and circle Earth before diving
+function createAircraftThreat(chapter: number, speedMultiplier = 1.0, cityId?: string): Threat {
+  const angle = Math.random() * Math.PI * 2;
+  const tilt = (Math.random() - 0.5) * 1.2; // slight vertical offset
+  const r = 3.2;
+  return {
+    id: generateThreatId(),
+    position: [Math.cos(angle) * r, tilt, Math.sin(angle) * r],
+    velocity: [0, 0, 0],
+    type: "aircraft",
+    speed: (0.6 + chapter * 0.05) * speedMultiplier,
+    hp: 2,
+    maxHp: 2,
+    targetCityId: cityId,
+  };
+}
+
 // ICBM threats spawn near the camera/front of screen and fly toward the globe
 function createIcbmThreat(chapter: number, speedMultiplier = 1.0, cityId?: string): Threat {
   const x = (Math.random() - 0.5) * 5.0;
@@ -80,6 +97,7 @@ interface EdgeIndicator {
   x: number;
   y: number;
   angle: number;
+  color: string;
 }
 
 const TOTAL_WAVES = 5;
@@ -154,6 +172,11 @@ export default function CombatScreen() {
           const cityId = CITY_IDS[Math.floor(Math.random() * CITY_IDS.length)];
           spawnThreat(createIcbmThreat(chapter, speedMult, cityId));
         }
+      }
+      // Chapter 3+: spawn enemy aircraft that orbit before diving
+      if (chapter >= 3) {
+        const cityId = CITY_IDS[Math.floor(Math.random() * CITY_IDS.length)];
+        spawnThreat(createAircraftThreat(chapter, speedMult, cityId));
       }
       // Reset slow-mo state at the start of each new wave so any lingering
       // slow-mo from the previous wave doesn't carry over
@@ -266,7 +289,8 @@ export default function CombatScreen() {
           ex = absY > 0 ? cx + (dx * halfH) / absY : cx;
         }
 
-        newIndicators.push({ id: threat.id, x: ex, y: ey, angle });
+        const indColor = threat.type === "aircraft" ? "#00ff44" : "#ff3333";
+        newIndicators.push({ id: threat.id, x: ex, y: ey, angle, color: indColor });
       }
 
       setEdgeIndicators(newIndicators);
@@ -584,7 +608,7 @@ export default function CombatScreen() {
               height: 0,
               borderTop: "10px solid transparent",
               borderBottom: "10px solid transparent",
-              borderLeft: "20px solid #ff3333",
+              borderLeft: `20px solid ${ind.color}`,
               animation: "edgeGlow 0.8s ease-in-out infinite",
               pointerEvents: "none",
             }}
@@ -598,7 +622,7 @@ export default function CombatScreen() {
               transform: "translate(-50%, -50%)",
               width: "36px",
               height: "36px",
-              border: "1px solid rgba(255,50,50,0.4)",
+              border: `1px solid ${ind.color}66`,
               borderRadius: "50%",
               pointerEvents: "none",
             }}

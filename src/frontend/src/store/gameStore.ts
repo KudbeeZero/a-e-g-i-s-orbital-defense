@@ -29,7 +29,7 @@ export interface Threat {
   id: string;
   position: [number, number, number];
   velocity: [number, number, number];
-  type: "debris" | "asteroid" | "missile" | "armored" | "icbm";
+  type: "debris" | "asteroid" | "missile" | "armored" | "icbm" | "aircraft";
   speed: number;
   hp: number;
   maxHp: number;
@@ -173,6 +173,7 @@ export interface GameState {
   setCooldown: (weapon: WeaponType, readyAt: number) => void;
   destroyCity: (id: string) => void;
   damageCity: (id: string) => void;
+  damageThreat: (id: string) => void;
   setWave: (n: number) => void;
   setTimeScale: (v: number) => void;
   setSlowMo: (v: boolean) => void;
@@ -313,6 +314,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((s) => ({ ammo: { ...s.ammo, [weapon]: amount } })),
   setCooldown: (weapon, readyAt) =>
     set((s) => ({ cooldowns: { ...s.cooldowns, [weapon]: readyAt } })),
+  damageThreat: (id) =>
+    set((s) => ({
+      threats: s.threats
+        .map((t) =>
+          t.id === id ? { ...t, hp: t.hp - 1 } : t,
+        )
+        .filter((t) => t.hp > 0) as typeof s.threats,
+    })),
   destroyCity: (id) =>
     set((s) => ({
       cities: s.cities.map((c) =>
