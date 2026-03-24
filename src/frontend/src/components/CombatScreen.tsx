@@ -2,7 +2,7 @@ import { Canvas } from "@react-three/fiber";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { useGameStore } from "../store/gameStore";
-import type { Threat } from "../store/gameStore";
+import type { Threat, WeaponType } from "../store/gameStore";
 import EarthScene from "./EarthScene";
 import HUD from "./HUD";
 
@@ -52,6 +52,23 @@ function createThreat(
   };
 }
 
+// ICBM threats spawn near the camera/front of screen and fly toward the globe
+function createIcbmThreat(chapter: number, speedMultiplier = 1.0, cityId?: string): Threat {
+  const x = (Math.random() - 0.5) * 5.0;
+  const y = (Math.random() - 0.5) * 3.0;
+  const z = 3.5 + Math.random() * 1.5;
+  return {
+    id: generateThreatId(),
+    position: [x, y, z],
+    velocity: [0, 0, 0],
+    type: "icbm",
+    speed: (0.45 + chapter * 0.04) * speedMultiplier,
+    hp: 1,
+    maxHp: 1,
+    targetCityId: cityId,
+  };
+}
+
 interface LockRing {
   x: number;
   y: number;
@@ -81,12 +98,16 @@ export default function CombatScreen() {
   const threats = useGameStore((s) => s.threats);
   const spawnThreat = useGameStore((s) => s.spawnThreat);
   const setTargetLock = useGameStore((s) => s.setTargetLock);
+  const targetLockId = useGameStore((s) => s.targetLockId);
   const attemptFire = useGameStore((s) => s.attemptFire);
   const setPhase = useGameStore((s) => s.setPhase);
   const saveToStorage = useGameStore((s) => s.saveToStorage);
   const setWave = useGameStore((s) => s.setWave);
   const wave = useGameStore((s) => s.wave);
   const resetCombo = useGameStore((s) => s.resetCombo);
+  const setSelectedWeapon = useGameStore((s) => s.setSelectedWeapon);
+  const setTimeScale = useGameStore((s) => s.setTimeScale);
+  const setSlowMo = useGameStore((s) => s.setSlowMo);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const [lockRing, setLockRing] = useState<LockRing | null>(null);
@@ -124,11 +145,23 @@ export default function CombatScreen() {
         const cityId = CITY_IDS[Math.floor(Math.random() * CITY_IDS.length)];
         spawnThreat(createThreat(chapter, speedMult, cityId));
       }
+      // Chapter 2+: spawn ICBM threats from the front (near camera)
+      if (chapter >= 2) {
+        const icbmCount = chapter >= 3 ? 2 + Math.min(waveIndex, 1) : 1;
+        for (let i = 0; i < icbmCount; i++) {
+          const cityId = CITY_IDS[Math.floor(Math.random() * CITY_IDS.length)];
+          spawnThreat(createIcbmThreat(chapter, speedMult, cityId));
+        }
+      }
+      // Reset slow-mo state at the start of each new wave so any lingering
+      // slow-mo from the previous wave doesn't carry over
+      setTimeScale(1.0);
+      setSlowMo(false);
       setWave(waveIndex + 1);
       waveActiveRef.current = true;
       setWaveClearing(false);
     },
-    [chapter, spawnThreat, setWave],
+    [chapter, spawnThreat, setWave, setTimeScale, setSlowMo],
   );
 
   const spawnWaveRef = useRef(spawnWave);
@@ -310,12 +343,53 @@ export default function CombatScreen() {
     [setTargetLock, attemptFire],
   );
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Escape") setTargetLock(null);
-    },
-    [setTargetLock],
-  );
+  // Cycle to next threat — sorted closest-to-player first
+  const cycleTarget = useCallback(() => {
+    if (threatsRef.current.length === 0) return;
+    const sorted = [...threatsRef.current].sort((a, b) => {
+      const da = Math.hypot(a.position[0], a.position[1], a.position[2] - 4);
+      const db = Math.hypot(b.position[0], b.position[1], b.position[2] - 4);
+      return da - db;
+    });
+    const currentId = useGameStore.getState().targetLockId;
+    const currentIdx = sorted.findIndex((t) => t.id === currentId);
+    const nextIdx = (currentIdx + 1) % sorted.length;
+    setTargetLock(sorted[nextIdx].id);
+  }, [setTargetLock]);
+
+  const cycleTargetRef = useRef(cycleTarget);
+  useEffect(() => { cycleTargetRef.current = cycleTarget; }, [cycleTarget]);
+
+  // Global keyboard handler — active regardless of focus
+  useEffect(() => {
+    const WEAPON_KEYS: Record<string, WeaponType> = {
+      "1": "heat-seeker",
+      "2": "cluster",
+      "3": "prox-burst",
+      "4": "kinetic",
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (WEAPON_KEYS[e.key]) {
+        setSelectedWeapon(WEAPON_KEYS[e.key]);
+        return;
+      }
+      switch (e.key) {
+        case "Tab":
+          e.preventDefault();
+          cycleTargetRef.current();
+          break;
+        case " ":
+          e.preventDefault();
+          if (useGameStore.getState().targetLockId) attemptFire();
+          break;
+        case "Escape":
+          setTargetLock(null);
+          break;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setTargetLock, attemptFire, setSelectedWeapon]);
 
   if (isPortrait) {
     return (
@@ -395,7 +469,6 @@ export default function CombatScreen() {
       style={{ background: "#000010", cursor: "crosshair" }}
       onClick={handleCanvasClick}
       onTouchEnd={handleCanvasClick}
-      onKeyDown={handleKeyDown}
     >
       <style>{`
         @keyframes lockRingAnim {

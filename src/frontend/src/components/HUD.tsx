@@ -617,6 +617,70 @@ export default function HUD() {
         </button>
       </div>
 
+      {/* Keyboard shortcuts hint — desktop only (hidden on touch devices) */}
+      <div
+        style={{
+          position: "absolute",
+          top: "12px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          gap: "10px",
+          alignItems: "center",
+          pointerEvents: "none",
+          opacity: 0.55,
+        }}
+        className="hidden sm:flex"
+      >
+        {(
+          [
+            ["1", "HSK"],
+            ["2", "CLU"],
+            ["3", "PRX"],
+            ["4", "KIN"],
+            ["TAB", "TARGET"],
+            ["SPC", "FIRE"],
+            ["ESC", "CLEAR"],
+          ] as [string, string][]
+        ).map(([key, label]) => (
+          <div
+            key={key}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "2px",
+            }}
+          >
+            <div
+              style={{
+                background: "rgba(0,229,255,0.12)",
+                border: "1px solid rgba(0,229,255,0.35)",
+                borderRadius: "3px",
+                padding: "1px 5px",
+                fontSize: "9px",
+                fontWeight: 700,
+                letterSpacing: "0.05em",
+                color: "#00e5ff",
+                minWidth: "26px",
+                textAlign: "center",
+              }}
+            >
+              {key}
+            </div>
+            <div
+              style={{
+                fontSize: "7px",
+                letterSpacing: "0.08em",
+                color: "rgba(0,229,255,0.6)",
+              }}
+            >
+              {label}
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Bottom nav tabs — raised BOTTOM_MARGIN from screen edge */}
       <div
         className="absolute left-0 right-0 flex pointer-events-auto"

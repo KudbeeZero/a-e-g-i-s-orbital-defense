@@ -1,5 +1,5 @@
 import { useFrame, useLoader, useThree } from "@react-three/fiber";
-import { Suspense, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { ASSETS } from "../assets";
 import { useGameStore } from "../store/gameStore";
@@ -108,12 +108,24 @@ function cityWorldPos(
   );
 }
 
-function CityMesh({ city }: { city: City }) {
+function CityMesh({ city, missileCount }: { city: City; missileCount: number }) {
   const lightRefs = useRef<(THREE.Mesh | null)[]>([]);
+  const siloRef = useRef<THREE.Mesh>(null);
+  const flashRef = useRef<THREE.Mesh>(null);
   const pulseRef = useRef(0);
+  const flashRef2 = useRef(0); // flash timer (seconds remaining)
+  const prevMissileCount = useRef(missileCount);
   const pos = latLonToLocal(city.lat, city.lon);
   const normal = pos.clone().normalize();
   const surfacePos = normal.clone().multiplyScalar(2.03);
+  const siloTip = normal.clone().multiplyScalar(2.1);
+
+  // Silo orientation: align cylinder along the surface normal
+  const siloQuaternion = useMemo(() => {
+    const q = new THREE.Quaternion();
+    q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+    return q;
+  }, [normal]);
 
   const lightPositions = useMemo(() => {
     const result: THREE.Vector3[] = [];
@@ -144,13 +156,33 @@ function CityMesh({ city }: { city: City }) {
     return result;
   }, [normal, surfacePos]);
 
-  useFrame(() => {
+  useFrame((_state, delta) => {
     pulseRef.current += 0.04;
     const brightness = 0.7 + Math.sin(pulseRef.current) * 0.3;
     for (const m of lightRefs.current) {
       if (!m) continue;
       const mat = m.material as THREE.MeshBasicMaterial;
       mat.opacity = brightness;
+    }
+
+    // Detect new missile fired → trigger launch flash
+    if (missileCount > prevMissileCount.current) {
+      flashRef2.current = 0.35;
+    }
+    prevMissileCount.current = missileCount;
+
+    // Animate launch flash
+    if (flashRef.current) {
+      const mat = flashRef.current.material as THREE.MeshBasicMaterial;
+      if (flashRef2.current > 0) {
+        flashRef2.current = Math.max(0, flashRef2.current - delta);
+        const t = flashRef2.current / 0.35;
+        mat.opacity = t * 0.9;
+        const scale = 1.0 + (1 - t) * 1.5;
+        flashRef.current.scale.setScalar(scale);
+      } else {
+        mat.opacity = 0;
+      }
     }
   });
 
@@ -165,6 +197,7 @@ function CityMesh({ city }: { city: City }) {
 
   return (
     <group>
+      {/* City glow sphere */}
       <mesh position={surfacePos}>
         <sphereGeometry args={[0.045, 8, 8]} />
         <meshBasicMaterial
@@ -174,6 +207,29 @@ function CityMesh({ city }: { city: City }) {
           depthWrite={false}
         />
       </mesh>
+
+      {/* Launch silo tube */}
+      <mesh
+        ref={siloRef}
+        position={surfacePos}
+        quaternion={siloQuaternion}
+      >
+        <cylinderGeometry args={[0.012, 0.018, 0.09, 6]} />
+        <meshBasicMaterial color="#00aaff" transparent opacity={0.75} />
+      </mesh>
+
+      {/* Launch flash — sphere at silo tip that pulses when firing */}
+      <mesh ref={flashRef} position={siloTip}>
+        <sphereGeometry args={[0.045, 8, 8]} />
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={0}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* City lights */}
       {lightPositions.map((lp, i) => (
         <mesh
           key={`${city.id}_l${i}`}
@@ -250,19 +306,37 @@ function ThreatMeshInner({ threat }: { threat: Threat }) {
     if (trailRef.current.length > 24) trailRef.current.shift();
   });
 
+  const isIcbm = threat.type === "icbm";
+
   const color =
     threat.type === "armored"
       ? "#ff8800"
-      : threat.type === "missile"
-        ? "#ff4400"
-        : "#ff2200";
+      : threat.type === "icbm"
+        ? "#ffcc00"
+        : threat.type === "missile"
+          ? "#ff4400"
+          : "#ff2200";
+
+  const trailColor = isIcbm ? "#ff8800" : "#ff5500";
+  const spriteScale: [number, number, number] = isIcbm
+    ? [0.35, 0.12, 1]
+    : [0.3, 0.15, 1];
 
   const BRACKET_KEYS = ["n", "e", "s", "w"] as const;
 
   return (
     <group>
-      <SmokeTrail points={trailRef.current} color="#ff5500" />
-      <sprite ref={spriteRef} scale={[0.3, 0.15, 1]}>
+      {isIcbm && (
+        <pointLight
+          position={[threat.position[0], threat.position[1], threat.position[2]]}
+          color="#ff6600"
+          intensity={1.5}
+          distance={1.2}
+          decay={2}
+        />
+      )}
+      <SmokeTrail points={trailRef.current} color={trailColor} />
+      <sprite ref={spriteRef} scale={spriteScale}>
         <spriteMaterial map={enemyTexture} color={color} />
       </sprite>
       {isLocked && (
@@ -683,11 +757,22 @@ export default function EarthScene({
   const slowMoTriggeredThreats = useRef(new Set<string>());
   const slowMoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nearMissedThreats = useRef(new Set<string>());
+  const wave = useGameStore((s) => s.wave);
+  const prevWaveRef = useRef(wave);
 
   const comboRef = useRef(combo);
   comboRef.current = combo;
   const lastKillTimeRef = useRef(lastKillTime);
   lastKillTimeRef.current = lastKillTime;
+
+  // Clear per-wave tracking Sets whenever a new wave starts
+  useEffect(() => {
+    if (wave !== prevWaveRef.current) {
+      prevWaveRef.current = wave;
+      slowMoTriggeredThreats.current.clear();
+      nearMissedThreats.current.clear();
+    }
+  }, [wave]);
 
   useFrame((_state, delta) => {
     const scaledDelta = delta * timeScale;
@@ -697,7 +782,9 @@ export default function EarthScene({
     if (cloudsRef.current)
       cloudsRef.current.rotation.y += 0.0013 * scaledDelta * 60;
 
-    if (cameraShake > 0) {
+    // Only apply camera shake while game is active (hull > 0)
+    const currentHull = useGameStore.getState().hull;
+    if (cameraShake > 0 && currentHull > 0) {
       const shakeAmount = cameraShake * 0.05;
       camera.position.x = (Math.random() - 0.5) * shakeAmount;
       camera.position.y = (Math.random() - 0.5) * shakeAmount;
@@ -719,11 +806,23 @@ export default function EarthScene({
     for (const threat of threats) {
       const pos = new THREE.Vector3(...threat.position);
 
+      // Find target: if the assigned city is destroyed, retarget nearest living city
       let targetPoint = new THREE.Vector3(0, 0, 0);
       if (threat.targetCityId) {
         const tCity = cities.find((c) => c.id === threat.targetCityId);
         if (tCity && !tCity.isDestroyed) {
           targetPoint = cityWorldPos(tCity.lat, tCity.lon, earthRotY);
+        } else {
+          // Assigned city destroyed — find nearest surviving city
+          let nearest: City | undefined;
+          let nearestDist = Number.POSITIVE_INFINITY;
+          for (const c of cities) {
+            if (c.isDestroyed) continue;
+            const cwp = cityWorldPos(c.lat, c.lon, earthRotY);
+            const d = pos.distanceTo(cwp);
+            if (d < nearestDist) { nearestDist = d; nearest = c; }
+          }
+          if (nearest) targetPoint = cityWorldPos(nearest.lat, nearest.lon, earthRotY);
         }
       }
       const toTarget = targetPoint.clone().sub(pos).normalize();
@@ -858,7 +957,7 @@ export default function EarthScene({
           />
         </mesh>
         {cities.map((city) => (
-          <CityMesh key={city.id} city={city} />
+          <CityMesh key={city.id} city={city} missileCount={missiles.length} />
         ))}
       </group>
 
