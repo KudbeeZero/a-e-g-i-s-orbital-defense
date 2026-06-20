@@ -1,0 +1,20 @@
+{
+  "schema": "aegis.memory.index/v1",
+  "project": "aegis-orbital-defense",
+  "lastScanned": "2026-06-20",
+  "scannedAtCommit": "97c15f1",
+  "docs": [
+    { "path": ".aegis/memory/README.md", "title": "Memory Layer — README", "updated": "2026-06-20" },
+    { "path": ".aegis/memory/00-overview.md", "title": "Overview", "updated": "2026-06-20" },
+    { "path": ".aegis/memory/01-architecture.md", "title": "Architecture", "updated": "2026-06-20" },
+    { "path": ".aegis/memory/02-system-scan.md", "title": "System Scan (Index)", "updated": "2026-06-20" },
+    { "path": ".aegis/memory/03-state-and-data.md", "title": "State & Data", "updated": "2026-06-20" },
+    { "path": ".aegis/memory/04-status.md", "title": "Status & Completeness Matrix", "updated": "2026-06-20" },
+    { "path": ".aegis/memory/05-decisions.md", "title": "Decision Log", "updated": "2026-06-20" },
+    { "path": ".aegis/memory/06-glossary.md", "title": "Glossary", "updated": "2026-06-20" }
+  ],
+  "related": [
+    { "path": ".aegis/project.manifest.json", "title": "Project Manifest (dashboard contract)" },
+    { "path": ".aegis/BACKLOG.md", "title": "Backlog" }
+  ]
+}
