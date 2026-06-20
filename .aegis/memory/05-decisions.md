@@ -4,6 +4,19 @@ Lightweight record of decisions. Newest at top. Each: what we decided, why, stat
 
 ---
 
+### D-005 · GitHub Pages for the playable preview link
+- **Date:** 2026-06-20
+- **Decision:** Publish the front end to GitHub Pages via
+  `.github/workflows/deploy-pages.yml` on merge to `main`. `vite.config.js` gains a
+  `base: process.env.BASE_PATH || "/"` so the ICP build is unaffected and only the Pages
+  build uses the repo subpath.
+- **Why:** Tomi wanted an easy preview link; the app builds static and plays without a
+  backend or login (verified). Pages = zero external accounts, fully in-repo.
+- **Trade-off:** Pages gives **one live URL refreshed on merge**, not per-PR previews.
+  Per-PR previews (Vercel/Netlify) remain the "bigger & better" follow-up in the backlog.
+- **Status:** Implemented (folded into PR #6). URL:
+  https://kudbeezero.github.io/a-e-g-i-s-orbital-defense/
+
 ### D-004 · Backlog tracked via GitHub Issues (going forward)
 - **Date:** 2026-06-20
 - **Decision:** The canonical backlog tracker is GitHub Issues (labels + milestones).

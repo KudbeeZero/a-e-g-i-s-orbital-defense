@@ -24,7 +24,7 @@ Motoko backend canister reserved for future server-side features.
 - **Backend:** Empty placeholder (`actor {}`) — no server logic yet.
 - **Persistence:** `localStorage` only (`aegis_save`).
 - **Tests:** None.
-- **CI/CD:** None (`.github/` absent).
+- **CI/CD:** GitHub Pages deploy workflow (preview link); no test/lint gate yet.
 - **Docs:** Stub README only (this memory layer is the first real documentation).
 
 See `04-status.md` for the full completeness matrix.
@@ -35,6 +35,7 @@ Radix/shadcn UI + Tailwind · TanStack Router/Query · ICP (Motoko + Internet Id
 pnpm workspaces · Docker.
 
 ## Links
+- **Playable preview (GitHub Pages):** https://kudbeezero.github.io/a-e-g-i-s-orbital-defense/ _(live after first merge to `main`)_
 - **Notion memory + dashboard:** _(to be populated — see `05-decisions.md` D-003)_
 - **GitHub universal memory layer:** _(planned — see `../BACKLOG.md`)_
 - **Backlog:** `../BACKLOG.md`

@@ -35,7 +35,7 @@
   },
   "healthSignals": {
     "tests": "none",
-    "ci": "none",
+    "ci": "github-pages-deploy",
     "backend": "stub",
     "docs": "memory-layer-only",
     "persistence": "local-only"
@@ -48,6 +48,7 @@
   },
   "links": {
     "repo": "https://github.com/KudbeeZero/a-e-g-i-s-orbital-defense",
+    "preview": "https://kudbeezero.github.io/a-e-g-i-s-orbital-defense/",
     "notion": null,
     "dashboard": null
   },

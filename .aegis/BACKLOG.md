@@ -11,10 +11,12 @@ live tracker (see decision D-004).
 
 ## P0 — Foundations (do first)
 
-### P0-1 · Add CI (GitHub Actions)
-- **Goal:** On every push/PR, run `pnpm typecheck` and Biome `pnpm check`; build the frontend.
+### P0-1 · Add CI quality gate (GitHub Actions)
+- **Status:** 🟡 partial — a **GitHub Pages deploy** workflow now exists
+  (`.github/workflows/deploy-pages.yml`); the **quality gate is still TODO**.
+- **Goal:** On every push/PR, run `pnpm typecheck` and Biome `pnpm check`; fail on errors.
 - **Acceptance:** A green/red check appears on PRs; broken types or lint fail the build.
-- **Bigger & better:** Add a build-artifact upload + preview deploy.
+- **Bigger & better:** Per-PR **preview deploys** (Vercel/Netlify) on top of the Pages URL.
 - **Labels:** `infra`, `ci`. **Why:** nothing guards quality on push today.
 
 ### P0-2 · Seed the backlog into GitHub Issues

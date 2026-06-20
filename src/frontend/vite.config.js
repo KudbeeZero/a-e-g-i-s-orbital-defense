@@ -14,6 +14,9 @@ process.env.STORAGE_GATEWAY_URL =
 
 export default defineConfig({
   logLevel: "error",
+  // Defaults to "/" (ICP/local build). The GitHub Pages workflow sets BASE_PATH
+  // to the repo subpath so assets resolve under the project Pages URL.
+  base: process.env.BASE_PATH || "/",
   build: {
     emptyOutDir: true,
     sourcemap: false,

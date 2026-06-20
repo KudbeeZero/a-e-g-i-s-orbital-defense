@@ -14,19 +14,20 @@ Scanned 2026-06-20 at commit `97c15f1`. Legend: ✅ done · 🟡 partial · ⛔ 
 | Combo + near-miss scoring | ✅ | "Phase 2" fields in store |
 | HUD / radar / weapon selector | ✅ | overlay components |
 | Cinematic intro | ✅ | `CinematicScreen.tsx` |
+| Static preview deploy (GitHub Pages) | ✅ | `.github/workflows/deploy-pages.yml`; published on merge to `main` |
 | Save / load progression | ✅ | `localStorage["aegis_save"]`, 5 fields |
 | Internet Identity auth | ✅ | login works; nothing gated behind it yet |
 | ICP backend logic | ⛔ | `actor {}` — no methods, no storage |
 | Server-side persistence / leaderboard | ⛔ | not started |
 | Automated tests | ⛔ | none in repo |
-| CI/CD | ⛔ | no `.github/workflows` |
+| CI/CD | 🟡 | GitHub Pages deploy workflow exists; no test/lint gate yet |
 | Documentation | 🟡 | stub README; this memory layer is the first real docs |
 | Audio / music / SFX | ⛔ | not observed |
 | Mobile / touch controls | 🟡 | `use-mobile` exists; gameplay input is desktop-oriented |
 
 ## Health signals (for the manifest)
 - `tests`: none
-- `ci`: none
+- `ci`: github-pages-deploy (no test/lint gate yet)
 - `backend`: stub (`actor {}`)
 - `docs`: stub README + this memory layer
 - `persistence`: local-only (`localStorage`)
