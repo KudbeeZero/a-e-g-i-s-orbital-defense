@@ -1,0 +1,56 @@
+{
+  "schema": "aegis.project.manifest/v1",
+  "id": "aegis-orbital-defense",
+  "name": "AEGIS Orbital Defense",
+  "slug": "aegis-orbital-defense",
+  "repo": "KudbeeZero/a-e-g-i-s-orbital-defense",
+  "description": "Browser-based 3D orbital-defense game: defend Earth's cities from incoming orbital threats. React + Three.js front end targeting Internet Computer (ICP) deployment.",
+  "stack": [
+    "React 19", "TypeScript", "Vite", "Three.js", "React Three Fiber", "React Three Cannon",
+    "Zustand", "Radix UI / shadcn", "Tailwind CSS", "TanStack Router", "TanStack Query",
+    "Motoko (ICP)", "Internet Identity", "pnpm", "Docker"
+  ],
+  "phase": "playable-prototype",
+  "status": "unfinished",
+  "lastScanned": "2026-06-20",
+  "scannedAtCommit": "97c15f1",
+  "entryPoints": [
+    "src/frontend/src/main.tsx",
+    "src/frontend/src/App.tsx",
+    "src/backend/main.mo"
+  ],
+  "modules": [
+    { "name": "Game store", "path": "src/frontend/src/store/gameStore.ts", "purpose": "All runtime state, game logic, save/load", "status": "implemented" },
+    { "name": "Phase router", "path": "src/frontend/src/App.tsx", "purpose": "menu/cinematic/combat/upgrade/gameover state machine", "status": "implemented" },
+    { "name": "Combat loop", "path": "src/frontend/src/components/CombatScreen.tsx", "purpose": "Per-frame spawn/trajectory/collision/scoring", "status": "implemented" },
+    { "name": "3D scene", "path": "src/frontend/src/components/EarthScene.tsx", "purpose": "Three.js Earth, threats, missiles, explosions", "status": "implemented" },
+    { "name": "HUD", "path": "src/frontend/src/components/HUD.tsx", "purpose": "Overlay UI (ammo, shield, hull, score, combo)", "status": "implemented" },
+    { "name": "ICP backend", "path": "src/backend/main.mo", "purpose": "Reserved server canister", "status": "stub" }
+  ],
+  "persistence": {
+    "type": "localStorage",
+    "key": "aegis_save",
+    "fields": ["chapter", "score", "upgrades", "maxCombo", "nearMisses"],
+    "serverSide": false
+  },
+  "healthSignals": {
+    "tests": "none",
+    "ci": "github-pages-deploy",
+    "backend": "stub",
+    "docs": "memory-layer-only",
+    "persistence": "local-only"
+  },
+  "backlogSummary": {
+    "source": ".aegis/BACKLOG.md",
+    "tracker": "github-issues (planned)",
+    "open": 12,
+    "byPriority": { "P0": 3, "P1": 4, "P2": 5 }
+  },
+  "links": {
+    "repo": "https://github.com/KudbeeZero/a-e-g-i-s-orbital-defense",
+    "preview": "https://kudbeezero.github.io/a-e-g-i-s-orbital-defense/",
+    "notion": null,
+    "dashboard": null
+  },
+  "tags": ["game", "3d", "threejs", "icp", "web3", "react", "unfinished"]
+}
