@@ -34,6 +34,15 @@ live tracker (see decision D-004).
 
 ---
 
+### P0-4 · Restore real fonts + untrack stale `dist/`
+- **Goal:** The repo's `assets/fonts/*.woff2` are ≤214-byte stubs (no real fonts anywhere),
+  so the UI falls back to system fonts. Source/commit the real display fonts. Separately,
+  `src/frontend/dist/` is a tracked, stale build artifact (degraded base64 assets) — untrack
+  it and add to `.gitignore`.
+- **Acceptance:** Custom fonts render on the live site; `dist/` no longer tracked.
+- **Bigger & better:** Self-host fonts via a tiny `@font-face` manifest checked in CI.
+- **Labels:** `assets`, `infra`. **Why:** found during the asset-wiring fix.
+
 ## P1 — Next
 
 ### P1-1 · Test harness + first tests

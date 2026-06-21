@@ -17,6 +17,9 @@ export default defineConfig({
   // Defaults to "/" (ICP/local build). The GitHub Pages workflow sets BASE_PATH
   // to the repo subpath so assets resolve under the project Pages URL.
   base: process.env.BASE_PATH || "/",
+  // The real binary assets (sprite PNGs, images) live in the top-level
+  // frontend/public; Vite's default publicDir (src/frontend/public) is empty.
+  publicDir: fileURLToPath(new URL("../../frontend/public", import.meta.url)),
   build: {
     emptyOutDir: true,
     sourcemap: false,

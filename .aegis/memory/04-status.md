@@ -15,6 +15,7 @@ Scanned 2026-06-20 at commit `97c15f1`. Legend: ✅ done · 🟡 partial · ⛔ 
 | HUD / radar / weapon selector | ✅ | overlay components |
 | Cinematic intro | ✅ | `CinematicScreen.tsx` |
 | Static preview deploy (GitHub Pages) | ✅ | `.github/workflows/deploy-pages.yml`; published on merge to `main` |
+| Combat assets / textures load | ✅ | Fixed: Vite `publicDir` now points at the real `frontend/public` (sprites were missing from the build); combat renders. Verified headlessly; final confirm on live URL |
 | Save / load progression | ✅ | `localStorage["aegis_save"]`, 5 fields |
 | Internet Identity auth | ✅ | login works; nothing gated behind it yet |
 | ICP backend logic | ⛔ | `actor {}` — no methods, no storage |
