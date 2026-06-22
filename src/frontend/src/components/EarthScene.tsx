@@ -941,7 +941,6 @@ export default function EarthScene({
   const incrementDestroyed = useGameStore((s) => s.incrementDestroyed);
   const cameraShake = useGameStore((s) => s.cameraShake);
   const setCameraShake = useGameStore((s) => s.setCameraShake);
-  const destroyCity = useGameStore((s) => s.destroyCity);
   const damageCity = useGameStore((s) => s.damageCity);
   const timeScale = useGameStore((s) => s.timeScale);
   const slowMoActive = useGameStore((s) => s.slowMoActive);

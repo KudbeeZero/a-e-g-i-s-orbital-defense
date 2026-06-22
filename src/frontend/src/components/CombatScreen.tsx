@@ -124,7 +124,6 @@ export default function CombatScreen() {
   const threats = useGameStore((s) => s.threats);
   const spawnThreat = useGameStore((s) => s.spawnThreat);
   const setTargetLock = useGameStore((s) => s.setTargetLock);
-  const targetLockId = useGameStore((s) => s.targetLockId);
   const attemptFire = useGameStore((s) => s.attemptFire);
   const setPhase = useGameStore((s) => s.setPhase);
   const saveToStorage = useGameStore((s) => s.saveToStorage);
@@ -506,6 +505,7 @@ export default function CombatScreen() {
   }
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: pointer-aim surface; keyboard controls are handled globally via the window keydown listener (Space fires, Tab cycles, Esc clears).
     <div
       ref={canvasRef}
       className="relative w-screen h-screen overflow-hidden"
