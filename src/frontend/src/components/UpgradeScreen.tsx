@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CHAPTER_COMPLETE_CREDITS } from "../data/weapons";
 import { useGameStore } from "../store/gameStore";
 
 const UPGRADES = [
@@ -57,6 +58,7 @@ export default function UpgradeScreen() {
   const setPhase = useGameStore((s) => s.setPhase);
   const existingUpgrades = useGameStore((s) => s.upgrades);
   const saveToStorage = useGameStore((s) => s.saveToStorage);
+  const addCredits = useGameStore((s) => s.addCredits);
 
   const [selected, setSelected] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -72,6 +74,7 @@ export default function UpgradeScreen() {
   const handleConfirm = () => {
     if (!selected) return;
     addUpgrade(selected);
+    addCredits(CHAPTER_COMPLETE_CREDITS);
     setConfirmed(true);
     const nextChapter = chapter + 1;
     if (nextChapter > 5) {

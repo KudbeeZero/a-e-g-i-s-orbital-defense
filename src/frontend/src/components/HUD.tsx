@@ -1,15 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { WEAPONS } from "../data/weapons";
 import { useGameStore } from "../store/gameStore";
-import type { WeaponType } from "../store/gameStore";
 import RadarDisplay from "./RadarDisplay";
 import WeaponSelector from "./WeaponSelector";
-
-const WEAPON_COLORS: Record<WeaponType, string> = {
-  "heat-seeker": "#00e5ff",
-  cluster: "#ffaa00",
-  "prox-burst": "#aa44ff",
-  kinetic: "#ffffff",
-};
 
 const TABS = ["CMD", "SCAN", "WPN", "SHIP", "LOG"];
 
@@ -160,9 +153,11 @@ export default function HUD() {
 
   const cooldownReady = cooldowns[selectedWeapon] <= now;
   const cooldownLeft = Math.max(0, (cooldowns[selectedWeapon] - now) / 1000);
-  const weaponColor = WEAPON_COLORS[selectedWeapon];
+  const weaponColor = WEAPONS[selectedWeapon].color;
   const citiesIntact = cities.filter((c) => !c.isDestroyed).length;
-  const citiesShielded = cities.filter((c) => !c.isDestroyed && c.shields > 0).length;
+  const citiesShielded = cities.filter(
+    (c) => !c.isDestroyed && c.shields > 0,
+  ).length;
 
   return (
     <div

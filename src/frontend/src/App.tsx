@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import ArmoryScreen from "./components/ArmoryScreen";
 import CinematicScreen from "./components/CinematicScreen";
 import CombatScreen from "./components/CombatScreen";
 import MenuScreen from "./components/MenuScreen";
@@ -15,6 +16,7 @@ export default function App() {
   }, [loadFromStorage]);
 
   if (phase === "menu") return <MenuScreen />;
+  if (phase === "armory") return <ArmoryScreen />;
   if (phase === "cinematic") return <CinematicScreen />;
   if (phase === "combat") return <CombatScreen />;
   if (phase === "upgrade") return <UpgradeScreen />;

@@ -9,6 +9,22 @@ live tracker (see decision D-004).
 
 ---
 
+## ✅ Recently shipped
+
+### Weapon Stash + loadout (with unlocks)
+- A real **Armory** screen (own → unlock → equip) replaces the old static
+  weapon list on the menu. Players earn **credits** (per kill + a per-chapter
+  bonus), **unlock** new weapons, and pick a **loadout** (max 4) carried into
+  combat. Three new weapon types added: **RAILGUN**, **EMP PULSE**, **FLAK
+  SPREAD**.
+- All weapon data now lives in one catalog: `src/frontend/src/data/weapons.ts`
+  (was duplicated across the store, HUD selector, and menu). Stash state
+  (`credits`, `ownedWeapons`, `loadout`) persists in the `aegis_save` schema.
+- **Follow-up (P2):** bespoke per-weapon flight/explosion FX — the new types
+  currently reuse existing missile/blast visuals tinted by catalog color.
+
+---
+
 ## P0 — Foundations (do first)
 
 ### P0-1 · Add CI quality gate (GitHub Actions)
@@ -54,8 +70,24 @@ live tracker (see decision D-004).
 ### P1-2 · Real README + contributor docs
 - **Goal:** Replace the Caffeine stub with run/build/deploy/architecture docs (link `.aegis/`).
 - **Acceptance:** A new dev can clone, install, and run locally from the README alone.
+- **Local-dev quickstart to document** (verified working): `pnpm install` at the
+  repo root, then `cd src/frontend && pnpm dev` and open the printed
+  `localhost:5173`. No backend or accounts required — the game is fully
+  client-side. Build with `pnpm build`; quality gates are `pnpm typecheck` and
+  `pnpm check` (Biome).
 - **Bigger & better:** Animated GIF/short clip of gameplay in the README.
 - **Labels:** `docs`.
+
+### P1-5 · Adobe Firefly art generation pass
+- **Goal:** Use Adobe Firefly to generate higher-fidelity game art and commit it
+  into the repo: missile/explosion sprites (replace the `/assets/generated/*`
+  placeholders) and a real Earth surface/night texture to replace the
+  procedural canvas art in `EarthScene.tsx`.
+- **Acceptance:** New sprites/textures render in-game via the existing
+  `assets.ts` path constants; no external runtime fetch (assets are bundled).
+- **Bigger & better:** A small, repeatable "art kit" prompt set so new weapon
+  types (railgun/emp/flak) and threats can get matching bespoke sprites.
+- **Labels:** `assets`, `art`.
 
 ### P1-3 · Audio: music + SFX
 - **Goal:** Add background score + fire/explosion/impact SFX with a mute toggle.
@@ -91,6 +123,14 @@ live tracker (see decision D-004).
 - Opt-in anonymous gameplay metrics to inform balance.
 - **Bigger & better:** A live ops dashboard fed from the same Notion pipeline.
 - **Labels:** `infra`, `analytics`.
+
+### P2-5 · Bespoke new-weapon FX
+- **Goal:** Give RAILGUN / EMP PULSE / FLAK SPREAD their own flight paths and
+  explosion visuals in `EarthScene.tsx` (they currently reuse existing
+  missile/blast art tinted by catalog color). E.g. a straight tracer beam for
+  railgun, an expanding ion ring for EMP, a pellet burst for flak.
+- **Acceptance:** Each new weapon is visually distinct in combat.
+- **Labels:** `gameplay`, `art`. **Why:** follow-up from the weapon-stash ship.
 
 ---
 

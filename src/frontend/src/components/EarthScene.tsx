@@ -2,8 +2,9 @@ import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { ASSETS } from "../assets";
+import { CREDITS_PER_KILL, WEAPONS } from "../data/weapons";
 import { useGameStore } from "../store/gameStore";
-import type { City, Missile, Threat } from "../store/gameStore";
+import type { City, Missile, Threat, WeaponType } from "../store/gameStore";
 
 interface AircraftState {
   orbitAngle: number;
@@ -104,16 +105,16 @@ function createNightTexture(): THREE.CanvasTexture {
 
   // City light clusters mapped to approximate continent positions
   const clusters = [
-    { x: 220, y: 255, rx: 90, ry: 45, count: 80, bright: 0.85 },  // North America East
-    { x: 178, y: 258, rx: 60, ry: 35, count: 55, bright: 0.65 },  // North America West
-    { x: 510, y: 230, rx: 80, ry: 38, count: 90, bright: 0.90 },  // Western Europe
-    { x: 565, y: 255, rx: 45, ry: 30, count: 40, bright: 0.60 },  // Middle East
-    { x: 690, y: 240, rx: 90, ry: 50, count: 95, bright: 0.95 },  // East Asia
-    { x: 640, y: 295, rx: 55, ry: 35, count: 50, bright: 0.55 },  // South Asia
-    { x: 315, y: 435, rx: 45, ry: 60, count: 35, bright: 0.40 },  // South America
-    { x: 530, y: 360, rx: 40, ry: 55, count: 25, bright: 0.30 },  // Sub-Saharan Africa
-    { x: 760, y: 455, rx: 50, ry: 30, count: 45, bright: 0.55 },  // Australia
-    { x: 385, y: 165, rx: 40, ry: 28, count: 30, bright: 0.50 },  // Greenland/Canada
+    { x: 220, y: 255, rx: 90, ry: 45, count: 80, bright: 0.85 }, // North America East
+    { x: 178, y: 258, rx: 60, ry: 35, count: 55, bright: 0.65 }, // North America West
+    { x: 510, y: 230, rx: 80, ry: 38, count: 90, bright: 0.9 }, // Western Europe
+    { x: 565, y: 255, rx: 45, ry: 30, count: 40, bright: 0.6 }, // Middle East
+    { x: 690, y: 240, rx: 90, ry: 50, count: 95, bright: 0.95 }, // East Asia
+    { x: 640, y: 295, rx: 55, ry: 35, count: 50, bright: 0.55 }, // South Asia
+    { x: 315, y: 435, rx: 45, ry: 60, count: 35, bright: 0.4 }, // South America
+    { x: 530, y: 360, rx: 40, ry: 55, count: 25, bright: 0.3 }, // Sub-Saharan Africa
+    { x: 760, y: 455, rx: 50, ry: 30, count: 45, bright: 0.55 }, // Australia
+    { x: 385, y: 165, rx: 40, ry: 28, count: 30, bright: 0.5 }, // Greenland/Canada
   ];
 
   for (const cl of clusters) {
@@ -168,7 +169,10 @@ function cityWorldPos(
   );
 }
 
-function CityMesh({ city, missileCount }: { city: City; missileCount: number }) {
+function CityMesh({
+  city,
+  missileCount,
+}: { city: City; missileCount: number }) {
   const lightRefs = useRef<(THREE.Mesh | null)[]>([]);
   const siloRef = useRef<THREE.Mesh>(null);
   const flashRef = useRef<THREE.Mesh>(null);
@@ -283,11 +287,7 @@ function CityMesh({ city, missileCount }: { city: City; missileCount: number }) 
       </mesh>
 
       {/* Launch silo tube */}
-      <mesh
-        ref={siloRef}
-        position={surfacePos}
-        quaternion={siloQuaternion}
-      >
+      <mesh ref={siloRef} position={surfacePos} quaternion={siloQuaternion}>
         <cylinderGeometry args={[0.012, 0.018, 0.09, 6]} />
         <meshBasicMaterial color="#00aaff" transparent opacity={0.75} />
       </mesh>
@@ -492,7 +492,11 @@ function ThreatMeshInner({ threat }: { threat: Threat }) {
     <group>
       {isIcbm && (
         <pointLight
-          position={[threat.position[0], threat.position[1], threat.position[2]]}
+          position={[
+            threat.position[0],
+            threat.position[1],
+            threat.position[2],
+          ]}
           color="#ff6600"
           intensity={1.5}
           distance={1.2}
@@ -501,7 +505,11 @@ function ThreatMeshInner({ threat }: { threat: Threat }) {
       )}
       {isAircraft && (
         <pointLight
-          position={[threat.position[0], threat.position[1], threat.position[2]]}
+          position={[
+            threat.position[0],
+            threat.position[1],
+            threat.position[2],
+          ]}
           color="#00ff44"
           intensity={1.2}
           distance={1.0}
@@ -573,7 +581,11 @@ function MissileMeshInner({
   onHit,
 }: {
   missile: Missile;
-  onHit: (id: string, pos: [number, number, number]) => void;
+  onHit: (
+    id: string,
+    pos: [number, number, number],
+    weaponType: WeaponType,
+  ) => void;
 }) {
   const spriteRef = useRef<THREE.Sprite>(null);
   const progressRef = useRef(0);
@@ -585,7 +597,9 @@ function MissileMeshInner({
   const threats = useGameStore((s) => s.threats);
   const timeScale = useGameStore((s) => s.timeScale);
   const missileUpgrades = useGameStore((s) => s.upgrades);
-  const trailBlazerCount = missileUpgrades.filter((u) => u === "trail-blazer").length;
+  const trailBlazerCount = missileUpgrades.filter(
+    (u) => u === "trail-blazer",
+  ).length;
   const trackBoost = 1.1 ** trailBlazerCount;
   const missilePaused = useGameStore((s) => s.paused);
   const playerTexture = useLoader(THREE.TextureLoader, ASSETS.missilePlayer);
@@ -605,8 +619,9 @@ function MissileMeshInner({
   }, [startPos, targetPos]);
 
   const targetVec = useMemo(() => new THREE.Vector3(...targetPos), [targetPos]);
-  const isHeatSeeker = missile.weaponType === "heat-seeker";
-  const speed = (missile.weaponType === "kinetic" ? 0.025 : 0.018) * trackBoost;
+  const weaponDef = WEAPONS[missile.weaponType];
+  const isHeatSeeker = weaponDef.behavior === "track";
+  const speed = weaponDef.missileSpeed * trackBoost;
   const velInitialized = useRef(false);
 
   useFrame((_state, delta) => {
@@ -637,7 +652,9 @@ function MissileMeshInner({
         .normalize()
         .multiplyScalar(missileSpeed);
       velocityRef.current.lerp(desired, 0.04 * trackBoost);
-      velocityRef.current.normalize().multiplyScalar(missileSpeed * scaledDelta * 60);
+      velocityRef.current
+        .normalize()
+        .multiplyScalar(missileSpeed * scaledDelta * 60);
       positionRef.current.add(velocityRef.current);
       currentPos = positionRef.current.clone();
     } else {
@@ -667,19 +684,16 @@ function MissileMeshInner({
     const doneByDist = distToTarget < 0.3;
 
     if (doneByProgress || doneByDist) {
-      onHit(missile.id, [currentPos.x, currentPos.y, currentPos.z]);
+      onHit(
+        missile.id,
+        [currentPos.x, currentPos.y, currentPos.z],
+        missile.weaponType,
+      );
       removeMissile(missile.id);
     }
   });
 
-  const missileColor =
-    missile.weaponType === "cluster"
-      ? "#ffaa00"
-      : missile.weaponType === "prox-burst"
-        ? "#aa44ff"
-        : missile.weaponType === "kinetic"
-          ? "#ffffff"
-          : "#00e5ff";
+  const missileColor = weaponDef.color;
 
   const trailColor = isHeatSeeker ? "#44aaff" : "#aaaaaa";
 
@@ -698,7 +712,11 @@ function MissileMesh({
   onHit,
 }: {
   missile: Missile;
-  onHit: (id: string, pos: [number, number, number]) => void;
+  onHit: (
+    id: string,
+    pos: [number, number, number],
+    weaponType: WeaponType,
+  ) => void;
 }) {
   return (
     <Suspense
@@ -937,6 +955,8 @@ export default function EarthScene({
   const upgrades = useGameStore((s) => s.upgrades);
   const paused = useGameStore((s) => s.paused);
   const damageThreat = useGameStore((s) => s.damageThreat);
+  const slowThreat = useGameStore((s) => s.slowThreat);
+  const addCredits = useGameStore((s) => s.addCredits);
 
   const earthTexture = useMemo(() => createEarthTexture(), []);
   const nightTexture = useMemo(() => createNightTexture(), []);
@@ -1042,9 +1062,13 @@ export default function EarthScene({
                 if (c.isDestroyed) continue;
                 const cwp = cityWorldPos(c.lat, c.lon, earthRotY);
                 const d = pos.distanceTo(cwp);
-                if (d < nearestDist) { nearestDist = d; nearest = c; }
+                if (d < nearestDist) {
+                  nearestDist = d;
+                  nearest = c;
+                }
               }
-              if (nearest) targetPoint = cityWorldPos(nearest.lat, nearest.lon, earthRotY);
+              if (nearest)
+                targetPoint = cityWorldPos(nearest.lat, nearest.lon, earthRotY);
             }
           }
           const toTarget = targetPoint.clone().sub(pos).normalize();
@@ -1055,30 +1079,34 @@ export default function EarthScene({
         threat.position[1] = pos.y;
         threat.position[2] = pos.z;
       } else {
-      // Find target: if the assigned city is destroyed, retarget nearest living city
-      let targetPoint = new THREE.Vector3(0, 0, 0);
-      if (threat.targetCityId) {
-        const tCity = cities.find((c) => c.id === threat.targetCityId);
-        if (tCity && !tCity.isDestroyed) {
-          targetPoint = cityWorldPos(tCity.lat, tCity.lon, earthRotY);
-        } else {
-          // Assigned city destroyed — find nearest surviving city
-          let nearest: City | undefined;
-          let nearestDist = Number.POSITIVE_INFINITY;
-          for (const c of cities) {
-            if (c.isDestroyed) continue;
-            const cwp = cityWorldPos(c.lat, c.lon, earthRotY);
-            const d = pos.distanceTo(cwp);
-            if (d < nearestDist) { nearestDist = d; nearest = c; }
+        // Find target: if the assigned city is destroyed, retarget nearest living city
+        let targetPoint = new THREE.Vector3(0, 0, 0);
+        if (threat.targetCityId) {
+          const tCity = cities.find((c) => c.id === threat.targetCityId);
+          if (tCity && !tCity.isDestroyed) {
+            targetPoint = cityWorldPos(tCity.lat, tCity.lon, earthRotY);
+          } else {
+            // Assigned city destroyed — find nearest surviving city
+            let nearest: City | undefined;
+            let nearestDist = Number.POSITIVE_INFINITY;
+            for (const c of cities) {
+              if (c.isDestroyed) continue;
+              const cwp = cityWorldPos(c.lat, c.lon, earthRotY);
+              const d = pos.distanceTo(cwp);
+              if (d < nearestDist) {
+                nearestDist = d;
+                nearest = c;
+              }
+            }
+            if (nearest)
+              targetPoint = cityWorldPos(nearest.lat, nearest.lon, earthRotY);
           }
-          if (nearest) targetPoint = cityWorldPos(nearest.lat, nearest.lon, earthRotY);
         }
-      }
-      const toTarget = targetPoint.clone().sub(pos).normalize();
-      pos.addScaledVector(toTarget, threat.speed * scaledDelta);
-      threat.position[0] = pos.x;
-      threat.position[1] = pos.y;
-      threat.position[2] = pos.z;
+        const toTarget = targetPoint.clone().sub(pos).normalize();
+        pos.addScaledVector(toTarget, threat.speed * scaledDelta);
+        threat.position[0] = pos.x;
+        threat.position[1] = pos.y;
+        threat.position[2] = pos.z;
       }
 
       const distToPlayer = pos.distanceTo(playerPos);
@@ -1140,19 +1168,24 @@ export default function EarthScene({
   const handleMissileHit = (
     _missileId: string,
     pos: [number, number, number],
+    weaponType: WeaponType,
   ) => {
     const hitPos = new THREE.Vector3(...pos);
     let hit = false;
     const currentCombo = comboRef.current;
     const multiplier = Math.min(5, 1 + currentCombo * 0.5);
 
-    const hitRadius = upgrades.includes("bigger-bang") ? 0.75 : 0.5;
+    const weaponDef = WEAPONS[weaponType];
+    const baseRadius = upgrades.includes("bigger-bang") ? 0.75 : 0.5;
+    const hitRadius = baseRadius * weaponDef.hitRadiusMult;
     for (const t of threats) {
       const tp = new THREE.Vector3(...t.position);
       if (tp.distanceTo(hitPos) < hitRadius) {
         if (t.type === "aircraft" && t.hp > 1) {
           // Aircraft requires 2 hits — damage but don't remove yet
           damageThreat(t.id);
+          // EMP slows survivors instead of relying on raw damage.
+          if (weaponDef.slows) slowThreat(t.id, 0.5);
           addExplosion({
             id: `exp_${Date.now()}_${Math.random()}`,
             position: [tp.x, tp.y, tp.z],
@@ -1165,6 +1198,7 @@ export default function EarthScene({
           removeThreat(t.id);
           const scoreAward = t.type === "aircraft" ? 200 : 100;
           addScore(Math.round(scoreAward * multiplier));
+          addCredits(CREDITS_PER_KILL);
           incrementDestroyed();
           incrementCombo();
           hit = true;
@@ -1251,7 +1285,11 @@ export default function EarthScene({
       {/* Ambient — deep space fill */}
       <ambientLight color="#404060" intensity={0.5} />
       {/* Rim light — cool back-scatter */}
-      <directionalLight position={[-5, -2, -5]} intensity={0.6} color="#66ccff" />
+      <directionalLight
+        position={[-5, -2, -5]}
+        intensity={0.6}
+        color="#66ccff"
+      />
 
       <group ref={earthGroupRef}>
         <mesh renderOrder={1}>
