@@ -5,6 +5,7 @@ import { useGameStore } from "../store/gameStore";
 import type { Threat } from "../store/gameStore";
 import EarthScene from "./EarthScene";
 import HUD from "./HUD";
+import PostFX from "./PostFX";
 
 function generateThreatId() {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -554,11 +555,20 @@ export default function CombatScreen() {
         camera={{ position: [0, 2, 8], fov: 50 }}
         onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
         style={{ width: "100%", height: "100%" }}
-        gl={{ antialias: true, alpha: false }}
+        // Clamp DPR for the balanced perf target; ACES tone mapping so bloom
+        // highlights roll off cleanly instead of clipping to white.
+        dpr={[1, 1.5]}
+        gl={{
+          antialias: true,
+          alpha: false,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.1,
+        }}
       >
         <Suspense fallback={null}>
           <EarthScene onThreatClick={setTargetLock} />
         </Suspense>
+        <PostFX />
       </Canvas>
 
       {waveClearing && (
