@@ -11,6 +11,20 @@ live tracker (see decision D-004).
 
 ## ✅ Recently shipped
 
+### Next-level graphics pass
+- **Bloom + tone mapping:** added `@react-three/postprocessing` (Bloom +
+  Vignette + combo-driven ChromaticAberration in `components/PostFX.tsx`),
+  ACESFilmic tone mapping, and a clamped DPR (`[1, 1.5]`) for a balanced perf
+  target.
+- **Earth overhaul:** 2048 textures with shared continent data driving a
+  bumpMap (relief), a roughnessMap (glossy oceans / matte land), a brighter
+  emissive night map, a sun-scatter atmosphere shader, and a banded procedural
+  cloud layer.
+- **Combat FX:** additive, brighter trails; tracers/explosions/lock-on visuals
+  set `toneMapped=false` so they bloom.
+- **Fonts:** real JetBrains Mono + Bricolage Grotesque via `@fontsource`
+  (was broken stubs) — see P0-4.
+
 ### Weapon Stash + loadout (with unlocks)
 - A real **Armory** screen (own → unlock → equip) replaces the old static
   weapon list on the menu. Players earn **credits** (per kill + a per-chapter
@@ -27,13 +41,12 @@ live tracker (see decision D-004).
 
 ## P0 — Foundations (do first)
 
-### P0-1 · Add CI quality gate (GitHub Actions)
-- **Status:** 🟡 partial — a **GitHub Pages deploy** workflow now exists
-  (`.github/workflows/deploy-pages.yml`); the **quality gate is still TODO**.
-- **Goal:** On every push/PR, run `pnpm typecheck` and Biome `pnpm check`; fail on errors.
-- **Acceptance:** A green/red check appears on PRs; broken types or lint fail the build.
-- **Bigger & better:** Per-PR **preview deploys** (Vercel/Netlify) on top of the Pages URL.
-- **Labels:** `infra`, `ci`. **Why:** nothing guards quality on push today.
+### P0-1 · Add CI quality gate (GitHub Actions) ✅ DONE
+- **Status:** ✅ done — `.github/workflows/ci.yml` runs typecheck + Biome on
+  every PR and non-`main` push; a green/red check now appears on PRs.
+- **Bigger & better (still open):** Per-PR **preview deploys** (Vercel/Netlify)
+  on top of the Pages URL; add Vitest to the gate once tests exist (P1-1).
+- **Labels:** `infra`, `ci`.
 
 ### P0-2 · Seed the backlog into GitHub Issues
 - **Goal:** Turn this file's items into labeled Issues with milestones.
@@ -50,13 +63,12 @@ live tracker (see decision D-004).
 
 ---
 
-### P0-4 · Restore real fonts + untrack stale `dist/`
-- **Goal:** The repo's `assets/fonts/*.woff2` are ≤214-byte stubs (no real fonts anywhere),
-  so the UI falls back to system fonts. Source/commit the real display fonts. Separately,
-  `src/frontend/dist/` is a tracked, stale build artifact (degraded base64 assets) — untrack
-  it and add to `.gitignore`.
-- **Acceptance:** Custom fonts render on the live site; `dist/` no longer tracked.
-- **Bigger & better:** Self-host fonts via a tiny `@font-face` manifest checked in CI.
+### P0-4 · Restore real fonts ✅ / untrack stale `dist/` (still open)
+- **Status:** ✅ fonts done — JetBrains Mono + Bricolage Grotesque now ship via
+  `@fontsource` packages (bundled + hashed by Vite), imported in `main.tsx`; the
+  broken `@font-face` stubs were removed. **Still open:** `src/frontend/dist/` is
+  a tracked, stale build artifact — untrack it and add to `.gitignore`.
+- **Acceptance (remaining):** `dist/` no longer tracked.
 - **Labels:** `assets`, `infra`. **Why:** found during the asset-wiring fix.
 
 ## P1 — Next
