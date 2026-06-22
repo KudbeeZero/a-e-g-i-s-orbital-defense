@@ -475,16 +475,18 @@ function SmokeTrail({
     <group>
       {points.map(({ id, pos }, i) => {
         const t = i / Math.max(points.length - 1, 1);
-        const opacity = t * 0.55;
-        const scale = 0.025 + (1 - t) * 0.02;
+        const opacity = t * 0.7;
+        const scale = 0.03 + (1 - t) * 0.022;
         return (
           <mesh key={id} position={pos}>
-            <sphereGeometry args={[scale, 4, 4]} />
+            <sphereGeometry args={[scale, 5, 5]} />
             <meshBasicMaterial
               color={color}
               transparent
               opacity={opacity}
               depthWrite={false}
+              blending={THREE.AdditiveBlending}
+              toneMapped={false}
             />
           </mesh>
         );
@@ -650,6 +652,7 @@ function ThreatMeshInner({ threat }: { threat: Threat }) {
             wireframe
             transparent
             opacity={0.7}
+            toneMapped={false}
           />
         </mesh>
       )}
@@ -666,7 +669,12 @@ function ThreatMeshInner({ threat }: { threat: Threat }) {
             ]}
           >
             <boxGeometry args={[0.035, 0.035, 0.035]} />
-            <meshBasicMaterial color="#00e5ff" transparent opacity={0.9} />
+            <meshBasicMaterial
+              color="#00e5ff"
+              transparent
+              opacity={0.9}
+              toneMapped={false}
+            />
           </mesh>
         ))}
     </group>
@@ -817,7 +825,11 @@ function MissileMeshInner({
     <group>
       <SmokeTrail points={trailRef.current} color={trailColor} />
       <sprite ref={spriteRef} scale={[0.2, 0.08, 1]}>
-        <spriteMaterial map={playerTexture} color={missileColor} />
+        <spriteMaterial
+          map={playerTexture}
+          color={missileColor}
+          toneMapped={false}
+        />
       </sprite>
     </group>
   );
@@ -972,8 +984,14 @@ function ExplosionFX({
   return (
     <group>
       <mesh ref={firebAllRef} position={pos}>
-        <sphereGeometry args={[0.3, 10, 10]} />
-        <meshBasicMaterial color="#ff6600" transparent opacity={1} />
+        <sphereGeometry args={[0.3, 12, 12]} />
+        <meshBasicMaterial
+          color="#ff6600"
+          transparent
+          opacity={1}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
       </mesh>
 
       <mesh ref={shockwaveRef} position={pos}>
@@ -983,6 +1001,8 @@ function ExplosionFX({
           transparent
           opacity={1}
           depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
         />
       </mesh>
 
@@ -994,6 +1014,8 @@ function ExplosionFX({
             transparent
             opacity={0.6}
             depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            toneMapped={false}
           />
         </mesh>
       )}
@@ -1031,6 +1053,8 @@ function ExplosionFX({
           transparent
           opacity={1}
           depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
         />
       </points>
     </group>
