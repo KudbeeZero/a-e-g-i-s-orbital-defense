@@ -18,4 +18,5 @@ Thumbs.db
 .idea/
 .vscode/
 
-# Note: src/frontend/dist/ is intentionally tracked in this repo and is NOT ignored.
+# Build output — rebuilt by CI (deploy-pages.yml) on every deploy.
+src/frontend/dist/

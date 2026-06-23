@@ -63,12 +63,11 @@ live tracker (see decision D-004).
 
 ---
 
-### P0-4 · Restore real fonts ✅ / untrack stale `dist/` (still open)
-- **Status:** ✅ fonts done — JetBrains Mono + Bricolage Grotesque now ship via
+### P0-4 · Restore real fonts ✅ / untrack stale `dist/` ✅ DONE
+- **Status:** ✅ done — JetBrains Mono + Bricolage Grotesque now ship via
   `@fontsource` packages (bundled + hashed by Vite), imported in `main.tsx`; the
-  broken `@font-face` stubs were removed. **Still open:** `src/frontend/dist/` is
-  a tracked, stale build artifact — untrack it and add to `.gitignore`.
-- **Acceptance (remaining):** `dist/` no longer tracked.
+  broken `@font-face` stubs were removed. `src/frontend/dist/` is now untracked
+  and added to `.gitignore` (rebuilt by `deploy-pages.yml` in CI).
 - **Labels:** `assets`, `infra`. **Why:** found during the asset-wiring fix.
 
 ## P1 — Next
