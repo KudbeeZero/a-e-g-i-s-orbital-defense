@@ -2,9 +2,10 @@ import { Canvas } from "@react-three/fiber";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { useGameStore } from "../store/gameStore";
-import type { Threat, WeaponType } from "../store/gameStore";
+import type { Threat } from "../store/gameStore";
 import EarthScene from "./EarthScene";
 import HUD from "./HUD";
+import PostFX from "./PostFX";
 
 function generateThreatId() {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -53,7 +54,11 @@ function createThreat(
 }
 
 // Aircraft threats spawn in low orbit and circle Earth before diving
-function createAircraftThreat(chapter: number, speedMultiplier = 1.0, cityId?: string): Threat {
+function createAircraftThreat(
+  chapter: number,
+  speedMultiplier = 1.0,
+  cityId?: string,
+): Threat {
   const angle = Math.random() * Math.PI * 2;
   const tilt = (Math.random() - 0.5) * 1.2; // slight vertical offset
   const r = 3.2;
@@ -70,7 +75,11 @@ function createAircraftThreat(chapter: number, speedMultiplier = 1.0, cityId?: s
 }
 
 // ICBM threats spawn near the camera/front of screen and fly toward the globe
-function createIcbmThreat(chapter: number, speedMultiplier = 1.0, cityId?: string): Threat {
+function createIcbmThreat(
+  chapter: number,
+  speedMultiplier = 1.0,
+  cityId?: string,
+): Threat {
   const x = (Math.random() - 0.5) * 5.0;
   const y = (Math.random() - 0.5) * 3.0;
   const z = 3.5 + Math.random() * 1.5;
@@ -116,7 +125,6 @@ export default function CombatScreen() {
   const threats = useGameStore((s) => s.threats);
   const spawnThreat = useGameStore((s) => s.spawnThreat);
   const setTargetLock = useGameStore((s) => s.setTargetLock);
-  const targetLockId = useGameStore((s) => s.targetLockId);
   const attemptFire = useGameStore((s) => s.attemptFire);
   const setPhase = useGameStore((s) => s.setPhase);
   const saveToStorage = useGameStore((s) => s.saveToStorage);
@@ -290,7 +298,13 @@ export default function CombatScreen() {
         }
 
         const indColor = threat.type === "aircraft" ? "#00ff44" : "#ff3333";
-        newIndicators.push({ id: threat.id, x: ex, y: ey, angle, color: indColor });
+        newIndicators.push({
+          id: threat.id,
+          x: ex,
+          y: ey,
+          angle,
+          color: indColor,
+        });
       }
 
       setEdgeIndicators(newIndicators);
@@ -384,19 +398,18 @@ export default function CombatScreen() {
   }, [setTargetLock]);
 
   const cycleTargetRef = useRef(cycleTarget);
-  useEffect(() => { cycleTargetRef.current = cycleTarget; }, [cycleTarget]);
+  useEffect(() => {
+    cycleTargetRef.current = cycleTarget;
+  }, [cycleTarget]);
 
   // Global keyboard handler — active regardless of focus
   useEffect(() => {
-    const WEAPON_KEYS: Record<string, WeaponType> = {
-      "1": "heat-seeker",
-      "2": "cluster",
-      "3": "prox-burst",
-      "4": "kinetic",
-    };
     const onKey = (e: KeyboardEvent) => {
-      if (WEAPON_KEYS[e.key]) {
-        setSelectedWeapon(WEAPON_KEYS[e.key]);
+      // Number keys 1-N select the matching slot in the current loadout.
+      if (/^[1-9]$/.test(e.key)) {
+        const loadout = useGameStore.getState().loadout;
+        const weapon = loadout[Number(e.key) - 1];
+        if (weapon) setSelectedWeapon(weapon);
         return;
       }
       switch (e.key) {
@@ -493,6 +506,7 @@ export default function CombatScreen() {
   }
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: pointer-aim surface; keyboard controls are handled globally via the window keydown listener (Space fires, Tab cycles, Esc clears).
     <div
       ref={canvasRef}
       className="relative w-screen h-screen overflow-hidden"
@@ -541,11 +555,20 @@ export default function CombatScreen() {
         camera={{ position: [0, 2, 8], fov: 50 }}
         onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
         style={{ width: "100%", height: "100%" }}
-        gl={{ antialias: true, alpha: false }}
+        // Clamp DPR for the balanced perf target; ACES tone mapping so bloom
+        // highlights roll off cleanly instead of clipping to white.
+        dpr={[1, 1.5]}
+        gl={{
+          antialias: true,
+          alpha: false,
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.1,
+        }}
       >
         <Suspense fallback={null}>
           <EarthScene onThreatClick={setTargetLock} />
         </Suspense>
+        <PostFX />
       </Canvas>
 
       {waveClearing && (

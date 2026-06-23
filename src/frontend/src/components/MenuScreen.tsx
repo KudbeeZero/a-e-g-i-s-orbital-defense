@@ -9,7 +9,6 @@ export default function MenuScreen() {
   const chapter = useGameStore((s) => s.chapter);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasSave, setHasSave] = useState(false);
-  const [showArmory, setShowArmory] = useState(false);
 
   useEffect(() => {
     const save = localStorage.getItem("aegis_save");
@@ -207,7 +206,7 @@ export default function MenuScreen() {
           <button
             type="button"
             data-ocid="menu.toggle"
-            onClick={() => setShowArmory(!showArmory)}
+            onClick={() => setPhase("armory")}
             className="w-full py-3 font-hud text-sm tracking-[0.12em] border transition-all"
             style={{
               background: "rgba(0,229,255,0.03)",
@@ -218,68 +217,6 @@ export default function MenuScreen() {
             ⬡ ARMORY
           </button>
         </div>
-
-        {showArmory && (
-          <div
-            className="w-full max-w-sm border p-4 font-hud text-xs"
-            style={{
-              background: "rgba(0,10,20,0.9)",
-              borderColor: "rgba(0,229,255,0.3)",
-              color: "rgba(0,229,255,0.8)",
-            }}
-          >
-            <div
-              className="text-center mb-3 tracking-widest"
-              style={{ color: "#00e5ff" }}
-            >
-              MISSILE ARSENAL
-            </div>
-            {[
-              {
-                name: "HEAT-SEEKER",
-                icon: "🎯",
-                desc: "Auto-tracks single target. 12 rounds.",
-                color: "#00e5ff",
-              },
-              {
-                name: "CLUSTER",
-                icon: "💥",
-                desc: "Splits into 3 warheads mid-flight. 8 rounds.",
-                color: "#ffaa00",
-              },
-              {
-                name: "PROX-BURST",
-                icon: "⚡",
-                desc: "Area detonation for clusters. 6 rounds.",
-                color: "#aa44ff",
-              },
-              {
-                name: "KINETIC",
-                icon: "⬡",
-                desc: "High-velocity precision strike. 10 rounds.",
-                color: "#ffffff",
-              },
-            ].map((w) => (
-              <div
-                key={w.name}
-                className="flex gap-3 items-start py-2 border-b"
-                style={{ borderColor: "rgba(0,229,255,0.1)" }}
-              >
-                <span className="text-lg">{w.icon}</span>
-                <div>
-                  <div className="font-bold" style={{ color: w.color }}>
-                    {w.name}
-                  </div>
-                  <div
-                    style={{ color: "rgba(255,255,255,0.5)", fontSize: "10px" }}
-                  >
-                    {w.desc}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div

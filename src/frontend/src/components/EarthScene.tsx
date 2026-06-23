@@ -2,8 +2,9 @@ import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { ASSETS } from "../assets";
+import { CREDITS_PER_KILL, WEAPONS } from "../data/weapons";
 import { useGameStore } from "../store/gameStore";
-import type { City, Missile, Threat } from "../store/gameStore";
+import type { City, Missile, Threat, WeaponType } from "../store/gameStore";
 
 interface AircraftState {
   orbitAngle: number;
@@ -13,107 +14,186 @@ interface AircraftState {
   divingToCity: boolean;
 }
 
-function createEarthTexture(): THREE.CanvasTexture {
-  const size = 1024;
+// Textures are authored in a 1024 coordinate space but rendered at higher
+// resolution; the context is scaled so existing coordinates stay valid.
+const TEX_REF = 1024;
+const TEX_SIZE = 2048;
+
+interface ContinentShape {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  rotate: number;
+  color: string;
+}
+
+// Shared landmass definitions so the color / bump / roughness maps stay aligned.
+const CONTINENTS: ContinentShape[] = [
+  { x: 220, y: 260, rx: 100, ry: 80, rotate: -0.3, color: "#2d6e2a" },
+  { x: 260, y: 320, rx: 70, ry: 50, rotate: 0.2, color: "#3a7830" },
+  { x: 280, y: 440, rx: 50, ry: 90, rotate: 0.3, color: "#2d6e2a" },
+  { x: 510, y: 235, rx: 55, ry: 40, rotate: -0.1, color: "#4a8a3a" },
+  { x: 510, y: 380, rx: 65, ry: 100, rotate: 0.0, color: "#5a7a30" },
+  { x: 680, y: 240, rx: 170, ry: 80, rotate: 0.05, color: "#4a8a3a" },
+  { x: 720, y: 300, rx: 100, ry: 50, rotate: -0.1, color: "#3a7030" },
+  { x: 760, y: 460, rx: 60, ry: 40, rotate: 0.15, color: "#7a7a30" },
+  { x: 380, y: 170, rx: 45, ry: 35, rotate: 0.3, color: "#8aaa8a" },
+];
+
+function newTexCanvas(): {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+} {
   const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = TEX_SIZE;
+  canvas.height = TEX_SIZE;
   const ctx = canvas.getContext("2d")!;
+  ctx.scale(TEX_SIZE / TEX_REF, TEX_SIZE / TEX_REF);
+  return { canvas, ctx };
+}
 
-  const oceanGrad = ctx.createLinearGradient(0, 0, 0, size);
-  oceanGrad.addColorStop(0, "#0a1a4e");
-  oceanGrad.addColorStop(0.5, "#0d3a7a");
-  oceanGrad.addColorStop(1, "#0a1a4e");
-  ctx.fillStyle = oceanGrad;
-  ctx.fillRect(0, 0, size, size);
-
-  const continents = [
-    { x: 220, y: 260, rx: 100, ry: 80, rotate: -0.3, color: "#2d6e2a" },
-    { x: 260, y: 320, rx: 70, ry: 50, rotate: 0.2, color: "#3a7830" },
-    { x: 280, y: 440, rx: 50, ry: 90, rotate: 0.3, color: "#2d6e2a" },
-    { x: 510, y: 235, rx: 55, ry: 40, rotate: -0.1, color: "#4a8a3a" },
-    { x: 510, y: 380, rx: 65, ry: 100, rotate: 0.0, color: "#5a7a30" },
-    { x: 680, y: 240, rx: 170, ry: 80, rotate: 0.05, color: "#4a8a3a" },
-    { x: 720, y: 300, rx: 100, ry: 50, rotate: -0.1, color: "#3a7030" },
-    { x: 760, y: 460, rx: 60, ry: 40, rotate: 0.15, color: "#7a7a30" },
-    { x: 380, y: 170, rx: 45, ry: 35, rotate: 0.3, color: "#8aaa8a" },
-  ];
-
-  for (const { x, y, rx, ry, rotate, color } of continents) {
+// Draw every landmass with a caller-supplied fill, plus optional interior
+// mottling so terrain reads as varied rather than flat ellipses.
+function drawContinents(
+  ctx: CanvasRenderingContext2D,
+  fill: (c: ContinentShape) => string,
+  mottle: (c: ContinentShape) => string | null,
+) {
+  for (const c of CONTINENTS) {
     ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(rotate);
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.rotate);
     ctx.beginPath();
-    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-    ctx.fillStyle = color;
+    ctx.ellipse(0, 0, c.rx, c.ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = fill(c);
     ctx.fill();
-    for (let i = 0; i < 6; i++) {
-      ctx.beginPath();
-      ctx.ellipse(
-        (Math.random() - 0.5) * rx * 1.2,
-        (Math.random() - 0.5) * ry * 1.2,
-        rx * 0.35 * Math.random() + 10,
-        ry * 0.25 * Math.random() + 8,
-        Math.random() * Math.PI,
-        0,
-        Math.PI * 2,
-      );
-      const r = Number.parseInt(color.slice(1, 3), 16);
-      const g = Number.parseInt(color.slice(3, 5), 16);
-      const b = Number.parseInt(color.slice(5, 7), 16);
-      ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.7)`;
-      ctx.fill();
+    const m = mottle(c);
+    if (m) {
+      for (let i = 0; i < 8; i++) {
+        ctx.beginPath();
+        ctx.ellipse(
+          (Math.random() - 0.5) * c.rx * 1.2,
+          (Math.random() - 0.5) * c.ry * 1.2,
+          c.rx * 0.35 * Math.random() + 10,
+          c.ry * 0.25 * Math.random() + 8,
+          Math.random() * Math.PI,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fillStyle = m;
+        ctx.fill();
+      }
     }
     ctx.restore();
   }
+}
 
-  const northPole = ctx.createRadialGradient(size / 2, 0, 0, size / 2, 0, 120);
+function createEarthTexture(): THREE.CanvasTexture {
+  const { canvas, ctx } = newTexCanvas();
+
+  const oceanGrad = ctx.createLinearGradient(0, 0, 0, TEX_REF);
+  oceanGrad.addColorStop(0, "#08163f");
+  oceanGrad.addColorStop(0.5, "#0d3a7a");
+  oceanGrad.addColorStop(1, "#08163f");
+  ctx.fillStyle = oceanGrad;
+  ctx.fillRect(0, 0, TEX_REF, TEX_REF);
+
+  drawContinents(
+    ctx,
+    (c) => c.color,
+    (c) => {
+      const r = Number.parseInt(c.color.slice(1, 3), 16);
+      const g = Number.parseInt(c.color.slice(3, 5), 16);
+      const b = Number.parseInt(c.color.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, 0.7)`;
+    },
+  );
+
+  const northPole = ctx.createRadialGradient(
+    TEX_REF / 2,
+    0,
+    0,
+    TEX_REF / 2,
+    0,
+    120,
+  );
   northPole.addColorStop(0, "rgba(220,235,255,0.95)");
   northPole.addColorStop(0.7, "rgba(180,210,255,0.5)");
   northPole.addColorStop(1, "rgba(180,210,255,0)");
   ctx.fillStyle = northPole;
-  ctx.fillRect(0, 0, size, 130);
+  ctx.fillRect(0, 0, TEX_REF, 130);
 
   const southPole = ctx.createRadialGradient(
-    size / 2,
-    size,
+    TEX_REF / 2,
+    TEX_REF,
     0,
-    size / 2,
-    size,
+    TEX_REF / 2,
+    TEX_REF,
     100,
   );
   southPole.addColorStop(0, "rgba(220,235,255,0.95)");
   southPole.addColorStop(0.7, "rgba(180,210,255,0.5)");
   southPole.addColorStop(1, "rgba(180,210,255,0)");
   ctx.fillStyle = southPole;
-  ctx.fillRect(0, size - 110, size, 110);
+  ctx.fillRect(0, TEX_REF - 110, TEX_REF, 110);
 
-  return new THREE.CanvasTexture(canvas);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+// Grayscale relief: oceans low, land raised — drives the Earth material's
+// bumpMap so terrain catches the key light.
+function createBumpTexture(): THREE.CanvasTexture {
+  const { canvas, ctx } = newTexCanvas();
+  ctx.fillStyle = "#1a1a1a";
+  ctx.fillRect(0, 0, TEX_REF, TEX_REF);
+  drawContinents(
+    ctx,
+    () => "#c8c8c8",
+    () => "rgba(255,255,255,0.5)",
+  );
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.NoColorSpace;
+  return tex;
+}
+
+// Roughness map: oceans smooth (dark → glossy specular), land rough (light).
+function createRoughnessTexture(): THREE.CanvasTexture {
+  const { canvas, ctx } = newTexCanvas();
+  ctx.fillStyle = "#3a3a3a"; // ~0.23 roughness over water for a sun glint
+  ctx.fillRect(0, 0, TEX_REF, TEX_REF);
+  drawContinents(
+    ctx,
+    () => "#f2f2f2",
+    () => null,
+  );
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.NoColorSpace;
+  return tex;
 }
 
 function createNightTexture(): THREE.CanvasTexture {
-  const size = 1024;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
+  const { canvas, ctx } = newTexCanvas();
 
   // Deep dark base — space-lit Earth at night
   ctx.fillStyle = "#010308";
-  ctx.fillRect(0, 0, size, size);
+  ctx.fillRect(0, 0, TEX_REF, TEX_REF);
 
   // City light clusters mapped to approximate continent positions
   const clusters = [
-    { x: 220, y: 255, rx: 90, ry: 45, count: 80, bright: 0.85 },  // North America East
-    { x: 178, y: 258, rx: 60, ry: 35, count: 55, bright: 0.65 },  // North America West
-    { x: 510, y: 230, rx: 80, ry: 38, count: 90, bright: 0.90 },  // Western Europe
-    { x: 565, y: 255, rx: 45, ry: 30, count: 40, bright: 0.60 },  // Middle East
-    { x: 690, y: 240, rx: 90, ry: 50, count: 95, bright: 0.95 },  // East Asia
-    { x: 640, y: 295, rx: 55, ry: 35, count: 50, bright: 0.55 },  // South Asia
-    { x: 315, y: 435, rx: 45, ry: 60, count: 35, bright: 0.40 },  // South America
-    { x: 530, y: 360, rx: 40, ry: 55, count: 25, bright: 0.30 },  // Sub-Saharan Africa
-    { x: 760, y: 455, rx: 50, ry: 30, count: 45, bright: 0.55 },  // Australia
-    { x: 385, y: 165, rx: 40, ry: 28, count: 30, bright: 0.50 },  // Greenland/Canada
+    { x: 220, y: 255, rx: 90, ry: 45, count: 80, bright: 1.0 }, // North America East
+    { x: 178, y: 258, rx: 60, ry: 35, count: 55, bright: 0.8 }, // North America West
+    { x: 510, y: 230, rx: 80, ry: 38, count: 90, bright: 1.0 }, // Western Europe
+    { x: 565, y: 255, rx: 45, ry: 30, count: 40, bright: 0.75 }, // Middle East
+    { x: 690, y: 240, rx: 90, ry: 50, count: 95, bright: 1.0 }, // East Asia
+    { x: 640, y: 295, rx: 55, ry: 35, count: 50, bright: 0.7 }, // South Asia
+    { x: 315, y: 435, rx: 45, ry: 60, count: 35, bright: 0.55 }, // South America
+    { x: 530, y: 360, rx: 40, ry: 55, count: 25, bright: 0.45 }, // Sub-Saharan Africa
+    { x: 760, y: 455, rx: 50, ry: 30, count: 45, bright: 0.7 }, // Australia
+    { x: 385, y: 165, rx: 40, ry: 28, count: 30, bright: 0.6 }, // Greenland/Canada
   ];
 
   for (const cl of clusters) {
@@ -140,7 +220,36 @@ function createNightTexture(): THREE.CanvasTexture {
     }
   }
 
-  return new THREE.CanvasTexture(canvas);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Soft white cloud puffs on a transparent sheet, biased into latitudinal
+// bands so the layer reads as weather systems rather than uniform fog.
+function createCloudTexture(): THREE.CanvasTexture {
+  const { canvas, ctx } = newTexCanvas();
+  ctx.clearRect(0, 0, TEX_REF, TEX_REF);
+  const bands = [0.18, 0.34, 0.5, 0.66, 0.82];
+  for (const band of bands) {
+    const puffs = 14;
+    for (let i = 0; i < puffs; i++) {
+      const cx = Math.random() * TEX_REF;
+      const cy = band * TEX_REF + (Math.random() - 0.5) * 90;
+      const r = 30 + Math.random() * 70;
+      const a = 0.18 + Math.random() * 0.4;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grad.addColorStop(0, `rgba(255,255,255,${a})`);
+      grad.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
 
 function latLonToLocal(lat: number, lon: number): THREE.Vector3 {
@@ -168,7 +277,10 @@ function cityWorldPos(
   );
 }
 
-function CityMesh({ city, missileCount }: { city: City; missileCount: number }) {
+function CityMesh({
+  city,
+  missileCount,
+}: { city: City; missileCount: number }) {
   const lightRefs = useRef<(THREE.Mesh | null)[]>([]);
   const siloRef = useRef<THREE.Mesh>(null);
   const flashRef = useRef<THREE.Mesh>(null);
@@ -283,11 +395,7 @@ function CityMesh({ city, missileCount }: { city: City; missileCount: number }) 
       </mesh>
 
       {/* Launch silo tube */}
-      <mesh
-        ref={siloRef}
-        position={surfacePos}
-        quaternion={siloQuaternion}
-      >
+      <mesh ref={siloRef} position={surfacePos} quaternion={siloQuaternion}>
         <cylinderGeometry args={[0.012, 0.018, 0.09, 6]} />
         <meshBasicMaterial color="#00aaff" transparent opacity={0.75} />
       </mesh>
@@ -367,16 +475,18 @@ function SmokeTrail({
     <group>
       {points.map(({ id, pos }, i) => {
         const t = i / Math.max(points.length - 1, 1);
-        const opacity = t * 0.55;
-        const scale = 0.025 + (1 - t) * 0.02;
+        const opacity = t * 0.7;
+        const scale = 0.03 + (1 - t) * 0.022;
         return (
           <mesh key={id} position={pos}>
-            <sphereGeometry args={[scale, 4, 4]} />
+            <sphereGeometry args={[scale, 5, 5]} />
             <meshBasicMaterial
               color={color}
               transparent
               opacity={opacity}
               depthWrite={false}
+              blending={THREE.AdditiveBlending}
+              toneMapped={false}
             />
           </mesh>
         );
@@ -387,9 +497,11 @@ function SmokeTrail({
 
 const ATMOSPHERE_VERT = `
   varying vec3 vNormal;
+  varying vec3 vWorldNormal;
   varying vec3 vWorldPosition;
   void main() {
     vNormal = normalize(normalMatrix * normal);
+    vWorldNormal = normalize(mat3(modelMatrix) * normal);
     vec4 worldPos = modelMatrix * vec4(position, 1.0);
     vWorldPosition = worldPos.xyz;
     gl_Position = projectionMatrix * viewMatrix * worldPos;
@@ -398,15 +510,19 @@ const ATMOSPHERE_VERT = `
 
 const ATMOSPHERE_FRAG = `
   varying vec3 vNormal;
+  varying vec3 vWorldNormal;
   varying vec3 vWorldPosition;
   uniform vec3 uCameraPos;
+  uniform vec3 uSunDir;
   void main() {
     vec3 viewDir = normalize(uCameraPos - vWorldPosition);
-    float fresnel = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 3.0);
-    vec3 innerColor = vec3(0.15, 0.55, 1.0);
-    vec3 outerColor = vec3(0.05, 0.25, 0.8);
-    vec3 color = mix(innerColor, outerColor, fresnel);
-    float intensity = fresnel * 0.85;
+    float fresnel = pow(1.0 - max(dot(viewDir, vNormal), 0.0), 2.6);
+    // Brighten the limb on the sunlit side for a scattered-light look.
+    float sun = max(dot(vWorldNormal, uSunDir), 0.0);
+    vec3 innerColor = vec3(0.25, 0.65, 1.0);
+    vec3 outerColor = vec3(0.05, 0.25, 0.85);
+    vec3 color = mix(outerColor, innerColor, sun);
+    float intensity = fresnel * (0.55 + 0.85 * sun);
     gl_FragColor = vec4(color * intensity, intensity);
   }
 `;
@@ -421,6 +537,8 @@ function AtmosphereShader({ radius }: { radius: number }) {
         fragmentShader: ATMOSPHERE_FRAG,
         uniforms: {
           uCameraPos: { value: new THREE.Vector3() },
+          // Matches the scene key light at [5, 3, 5].
+          uSunDir: { value: new THREE.Vector3(5, 3, 5).normalize() },
         },
         blending: THREE.AdditiveBlending,
         transparent: true,
@@ -492,7 +610,11 @@ function ThreatMeshInner({ threat }: { threat: Threat }) {
     <group>
       {isIcbm && (
         <pointLight
-          position={[threat.position[0], threat.position[1], threat.position[2]]}
+          position={[
+            threat.position[0],
+            threat.position[1],
+            threat.position[2],
+          ]}
           color="#ff6600"
           intensity={1.5}
           distance={1.2}
@@ -501,7 +623,11 @@ function ThreatMeshInner({ threat }: { threat: Threat }) {
       )}
       {isAircraft && (
         <pointLight
-          position={[threat.position[0], threat.position[1], threat.position[2]]}
+          position={[
+            threat.position[0],
+            threat.position[1],
+            threat.position[2],
+          ]}
           color="#00ff44"
           intensity={1.2}
           distance={1.0}
@@ -526,6 +652,7 @@ function ThreatMeshInner({ threat }: { threat: Threat }) {
             wireframe
             transparent
             opacity={0.7}
+            toneMapped={false}
           />
         </mesh>
       )}
@@ -542,7 +669,12 @@ function ThreatMeshInner({ threat }: { threat: Threat }) {
             ]}
           >
             <boxGeometry args={[0.035, 0.035, 0.035]} />
-            <meshBasicMaterial color="#00e5ff" transparent opacity={0.9} />
+            <meshBasicMaterial
+              color="#00e5ff"
+              transparent
+              opacity={0.9}
+              toneMapped={false}
+            />
           </mesh>
         ))}
     </group>
@@ -573,7 +705,11 @@ function MissileMeshInner({
   onHit,
 }: {
   missile: Missile;
-  onHit: (id: string, pos: [number, number, number]) => void;
+  onHit: (
+    id: string,
+    pos: [number, number, number],
+    weaponType: WeaponType,
+  ) => void;
 }) {
   const spriteRef = useRef<THREE.Sprite>(null);
   const progressRef = useRef(0);
@@ -585,7 +721,9 @@ function MissileMeshInner({
   const threats = useGameStore((s) => s.threats);
   const timeScale = useGameStore((s) => s.timeScale);
   const missileUpgrades = useGameStore((s) => s.upgrades);
-  const trailBlazerCount = missileUpgrades.filter((u) => u === "trail-blazer").length;
+  const trailBlazerCount = missileUpgrades.filter(
+    (u) => u === "trail-blazer",
+  ).length;
   const trackBoost = 1.1 ** trailBlazerCount;
   const missilePaused = useGameStore((s) => s.paused);
   const playerTexture = useLoader(THREE.TextureLoader, ASSETS.missilePlayer);
@@ -605,8 +743,9 @@ function MissileMeshInner({
   }, [startPos, targetPos]);
 
   const targetVec = useMemo(() => new THREE.Vector3(...targetPos), [targetPos]);
-  const isHeatSeeker = missile.weaponType === "heat-seeker";
-  const speed = (missile.weaponType === "kinetic" ? 0.025 : 0.018) * trackBoost;
+  const weaponDef = WEAPONS[missile.weaponType];
+  const isHeatSeeker = weaponDef.behavior === "track";
+  const speed = weaponDef.missileSpeed * trackBoost;
   const velInitialized = useRef(false);
 
   useFrame((_state, delta) => {
@@ -637,7 +776,9 @@ function MissileMeshInner({
         .normalize()
         .multiplyScalar(missileSpeed);
       velocityRef.current.lerp(desired, 0.04 * trackBoost);
-      velocityRef.current.normalize().multiplyScalar(missileSpeed * scaledDelta * 60);
+      velocityRef.current
+        .normalize()
+        .multiplyScalar(missileSpeed * scaledDelta * 60);
       positionRef.current.add(velocityRef.current);
       currentPos = positionRef.current.clone();
     } else {
@@ -667,19 +808,16 @@ function MissileMeshInner({
     const doneByDist = distToTarget < 0.3;
 
     if (doneByProgress || doneByDist) {
-      onHit(missile.id, [currentPos.x, currentPos.y, currentPos.z]);
+      onHit(
+        missile.id,
+        [currentPos.x, currentPos.y, currentPos.z],
+        missile.weaponType,
+      );
       removeMissile(missile.id);
     }
   });
 
-  const missileColor =
-    missile.weaponType === "cluster"
-      ? "#ffaa00"
-      : missile.weaponType === "prox-burst"
-        ? "#aa44ff"
-        : missile.weaponType === "kinetic"
-          ? "#ffffff"
-          : "#00e5ff";
+  const missileColor = weaponDef.color;
 
   const trailColor = isHeatSeeker ? "#44aaff" : "#aaaaaa";
 
@@ -687,7 +825,11 @@ function MissileMeshInner({
     <group>
       <SmokeTrail points={trailRef.current} color={trailColor} />
       <sprite ref={spriteRef} scale={[0.2, 0.08, 1]}>
-        <spriteMaterial map={playerTexture} color={missileColor} />
+        <spriteMaterial
+          map={playerTexture}
+          color={missileColor}
+          toneMapped={false}
+        />
       </sprite>
     </group>
   );
@@ -698,7 +840,11 @@ function MissileMesh({
   onHit,
 }: {
   missile: Missile;
-  onHit: (id: string, pos: [number, number, number]) => void;
+  onHit: (
+    id: string,
+    pos: [number, number, number],
+    weaponType: WeaponType,
+  ) => void;
 }) {
   return (
     <Suspense
@@ -838,8 +984,14 @@ function ExplosionFX({
   return (
     <group>
       <mesh ref={firebAllRef} position={pos}>
-        <sphereGeometry args={[0.3, 10, 10]} />
-        <meshBasicMaterial color="#ff6600" transparent opacity={1} />
+        <sphereGeometry args={[0.3, 12, 12]} />
+        <meshBasicMaterial
+          color="#ff6600"
+          transparent
+          opacity={1}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
       </mesh>
 
       <mesh ref={shockwaveRef} position={pos}>
@@ -849,6 +1001,8 @@ function ExplosionFX({
           transparent
           opacity={1}
           depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
         />
       </mesh>
 
@@ -860,6 +1014,8 @@ function ExplosionFX({
             transparent
             opacity={0.6}
             depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            toneMapped={false}
           />
         </mesh>
       )}
@@ -897,6 +1053,8 @@ function ExplosionFX({
           transparent
           opacity={1}
           depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
         />
       </points>
     </group>
@@ -923,7 +1081,6 @@ export default function EarthScene({
   const incrementDestroyed = useGameStore((s) => s.incrementDestroyed);
   const cameraShake = useGameStore((s) => s.cameraShake);
   const setCameraShake = useGameStore((s) => s.setCameraShake);
-  const destroyCity = useGameStore((s) => s.destroyCity);
   const damageCity = useGameStore((s) => s.damageCity);
   const timeScale = useGameStore((s) => s.timeScale);
   const slowMoActive = useGameStore((s) => s.slowMoActive);
@@ -937,9 +1094,14 @@ export default function EarthScene({
   const upgrades = useGameStore((s) => s.upgrades);
   const paused = useGameStore((s) => s.paused);
   const damageThreat = useGameStore((s) => s.damageThreat);
+  const slowThreat = useGameStore((s) => s.slowThreat);
+  const addCredits = useGameStore((s) => s.addCredits);
 
   const earthTexture = useMemo(() => createEarthTexture(), []);
   const nightTexture = useMemo(() => createNightTexture(), []);
+  const bumpTexture = useMemo(() => createBumpTexture(), []);
+  const roughnessTexture = useMemo(() => createRoughnessTexture(), []);
+  const cloudTexture = useMemo(() => createCloudTexture(), []);
   const slowMoTriggeredThreats = useRef(new Set<string>());
   const slowMoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nearMissedThreats = useRef(new Set<string>());
@@ -1042,9 +1204,13 @@ export default function EarthScene({
                 if (c.isDestroyed) continue;
                 const cwp = cityWorldPos(c.lat, c.lon, earthRotY);
                 const d = pos.distanceTo(cwp);
-                if (d < nearestDist) { nearestDist = d; nearest = c; }
+                if (d < nearestDist) {
+                  nearestDist = d;
+                  nearest = c;
+                }
               }
-              if (nearest) targetPoint = cityWorldPos(nearest.lat, nearest.lon, earthRotY);
+              if (nearest)
+                targetPoint = cityWorldPos(nearest.lat, nearest.lon, earthRotY);
             }
           }
           const toTarget = targetPoint.clone().sub(pos).normalize();
@@ -1055,30 +1221,34 @@ export default function EarthScene({
         threat.position[1] = pos.y;
         threat.position[2] = pos.z;
       } else {
-      // Find target: if the assigned city is destroyed, retarget nearest living city
-      let targetPoint = new THREE.Vector3(0, 0, 0);
-      if (threat.targetCityId) {
-        const tCity = cities.find((c) => c.id === threat.targetCityId);
-        if (tCity && !tCity.isDestroyed) {
-          targetPoint = cityWorldPos(tCity.lat, tCity.lon, earthRotY);
-        } else {
-          // Assigned city destroyed — find nearest surviving city
-          let nearest: City | undefined;
-          let nearestDist = Number.POSITIVE_INFINITY;
-          for (const c of cities) {
-            if (c.isDestroyed) continue;
-            const cwp = cityWorldPos(c.lat, c.lon, earthRotY);
-            const d = pos.distanceTo(cwp);
-            if (d < nearestDist) { nearestDist = d; nearest = c; }
+        // Find target: if the assigned city is destroyed, retarget nearest living city
+        let targetPoint = new THREE.Vector3(0, 0, 0);
+        if (threat.targetCityId) {
+          const tCity = cities.find((c) => c.id === threat.targetCityId);
+          if (tCity && !tCity.isDestroyed) {
+            targetPoint = cityWorldPos(tCity.lat, tCity.lon, earthRotY);
+          } else {
+            // Assigned city destroyed — find nearest surviving city
+            let nearest: City | undefined;
+            let nearestDist = Number.POSITIVE_INFINITY;
+            for (const c of cities) {
+              if (c.isDestroyed) continue;
+              const cwp = cityWorldPos(c.lat, c.lon, earthRotY);
+              const d = pos.distanceTo(cwp);
+              if (d < nearestDist) {
+                nearestDist = d;
+                nearest = c;
+              }
+            }
+            if (nearest)
+              targetPoint = cityWorldPos(nearest.lat, nearest.lon, earthRotY);
           }
-          if (nearest) targetPoint = cityWorldPos(nearest.lat, nearest.lon, earthRotY);
         }
-      }
-      const toTarget = targetPoint.clone().sub(pos).normalize();
-      pos.addScaledVector(toTarget, threat.speed * scaledDelta);
-      threat.position[0] = pos.x;
-      threat.position[1] = pos.y;
-      threat.position[2] = pos.z;
+        const toTarget = targetPoint.clone().sub(pos).normalize();
+        pos.addScaledVector(toTarget, threat.speed * scaledDelta);
+        threat.position[0] = pos.x;
+        threat.position[1] = pos.y;
+        threat.position[2] = pos.z;
       }
 
       const distToPlayer = pos.distanceTo(playerPos);
@@ -1140,19 +1310,24 @@ export default function EarthScene({
   const handleMissileHit = (
     _missileId: string,
     pos: [number, number, number],
+    weaponType: WeaponType,
   ) => {
     const hitPos = new THREE.Vector3(...pos);
     let hit = false;
     const currentCombo = comboRef.current;
     const multiplier = Math.min(5, 1 + currentCombo * 0.5);
 
-    const hitRadius = upgrades.includes("bigger-bang") ? 0.75 : 0.5;
+    const weaponDef = WEAPONS[weaponType];
+    const baseRadius = upgrades.includes("bigger-bang") ? 0.75 : 0.5;
+    const hitRadius = baseRadius * weaponDef.hitRadiusMult;
     for (const t of threats) {
       const tp = new THREE.Vector3(...t.position);
       if (tp.distanceTo(hitPos) < hitRadius) {
         if (t.type === "aircraft" && t.hp > 1) {
           // Aircraft requires 2 hits — damage but don't remove yet
           damageThreat(t.id);
+          // EMP slows survivors instead of relying on raw damage.
+          if (weaponDef.slows) slowThreat(t.id, 0.5);
           addExplosion({
             id: `exp_${Date.now()}_${Math.random()}`,
             position: [tp.x, tp.y, tp.z],
@@ -1165,6 +1340,7 @@ export default function EarthScene({
           removeThreat(t.id);
           const scoreAward = t.type === "aircraft" ? 200 : 100;
           addScore(Math.round(scoreAward * multiplier));
+          addCredits(CREDITS_PER_KILL);
           incrementDestroyed();
           incrementCombo();
           hit = true;
@@ -1251,7 +1427,11 @@ export default function EarthScene({
       {/* Ambient — deep space fill */}
       <ambientLight color="#404060" intensity={0.5} />
       {/* Rim light — cool back-scatter */}
-      <directionalLight position={[-5, -2, -5]} intensity={0.6} color="#66ccff" />
+      <directionalLight
+        position={[-5, -2, -5]}
+        intensity={0.6}
+        color="#66ccff"
+      />
 
       <group ref={earthGroupRef}>
         <mesh renderOrder={1}>
@@ -1260,9 +1440,12 @@ export default function EarthScene({
             map={earthTexture}
             emissiveMap={nightTexture}
             emissive="#ffffff"
-            emissiveIntensity={1.0}
-            roughness={0.85}
-            metalness={0.1}
+            emissiveIntensity={1.6}
+            bumpMap={bumpTexture}
+            bumpScale={2.5}
+            roughnessMap={roughnessTexture}
+            roughness={1.0}
+            metalness={0.0}
           />
         </mesh>
         {cities.map((city) => (
@@ -1277,9 +1460,13 @@ export default function EarthScene({
       <mesh ref={cloudsRef}>
         <sphereGeometry args={[2.05, 64, 64]} />
         <meshStandardMaterial
+          map={cloudTexture}
+          alphaMap={cloudTexture}
           color="white"
           transparent
-          opacity={0.35}
+          opacity={0.9}
+          roughness={1}
+          metalness={0}
           depthWrite={false}
         />
       </mesh>

@@ -1,19 +1,36 @@
 import { create } from "zustand";
+import {
+  CREDITS_PER_KILL,
+  DEFAULT_LOADOUT,
+  DEFAULT_OWNED_WEAPONS,
+  MAX_LOADOUT,
+  WEAPONS,
+  WEAPON_ORDER,
+} from "../data/weapons";
 
 export type GamePhase =
   | "menu"
+  | "armory"
   | "cinematic"
   | "combat"
   | "upgrade"
   | "gameover";
-export type WeaponType = "heat-seeker" | "cluster" | "prox-burst" | "kinetic";
+export type WeaponType =
+  | "heat-seeker"
+  | "cluster"
+  | "prox-burst"
+  | "kinetic"
+  | "railgun"
+  | "emp"
+  | "flak";
 
-export const WEAPON_COOLDOWNS: Record<WeaponType, number> = {
-  "heat-seeker": 1500,
-  cluster: 3000,
-  "prox-burst": 4000,
-  kinetic: 2000,
-};
+export const WEAPON_COOLDOWNS: Record<WeaponType, number> = WEAPON_ORDER.reduce(
+  (acc, id) => {
+    acc[id] = WEAPONS[id].cooldownMs;
+    return acc;
+  },
+  {} as Record<WeaponType, number>,
+);
 
 export interface City {
   id: string;
@@ -134,6 +151,10 @@ export interface GameState {
   upgrades: string[];
   ammo: Record<WeaponType, number>;
   cooldowns: Record<WeaponType, number>;
+  // Weapon stash
+  credits: number;
+  ownedWeapons: WeaponType[];
+  loadout: WeaponType[];
   threatCount: number;
   threatsDestroyed: number;
   activeTab: string;
@@ -171,6 +192,10 @@ export interface GameState {
   saveToStorage: () => void;
   setAmmo: (weapon: WeaponType, amount: number) => void;
   setCooldown: (weapon: WeaponType, readyAt: number) => void;
+  addCredits: (n: number) => void;
+  unlockWeapon: (weapon: WeaponType) => boolean;
+  toggleLoadout: (weapon: WeaponType) => void;
+  slowThreat: (id: string, factor: number) => void;
   destroyCity: (id: string) => void;
   damageCity: (id: string) => void;
   damageThreat: (id: string) => void;
@@ -184,19 +209,36 @@ export interface GameState {
   attemptFire: () => boolean;
 }
 
-const DEFAULT_AMMO: Record<WeaponType, number> = {
-  "heat-seeker": 12,
-  cluster: 8,
-  "prox-burst": 6,
-  kinetic: 10,
-};
+const DEFAULT_AMMO: Record<WeaponType, number> = WEAPON_ORDER.reduce(
+  (acc, id) => {
+    acc[id] = WEAPONS[id].baseAmmo;
+    return acc;
+  },
+  {} as Record<WeaponType, number>,
+);
 
-const DEFAULT_COOLDOWN: Record<WeaponType, number> = {
-  "heat-seeker": 0,
-  cluster: 0,
-  "prox-burst": 0,
-  kinetic: 0,
-};
+const DEFAULT_COOLDOWN: Record<WeaponType, number> = WEAPON_ORDER.reduce(
+  (acc, id) => {
+    acc[id] = 0;
+    return acc;
+  },
+  {} as Record<WeaponType, number>,
+);
+
+// Stock ammo for a fresh combat run: weapons in the loadout get their base
+// ammo (plus the ammo-boost bonus); everything else stays at zero.
+function buildCombatAmmo(
+  loadout: WeaponType[],
+  ammoBonus: number,
+): Record<WeaponType, number> {
+  return WEAPON_ORDER.reduce(
+    (acc, id) => {
+      acc[id] = loadout.includes(id) ? WEAPONS[id].baseAmmo + ammoBonus : 0;
+      return acc;
+    },
+    {} as Record<WeaponType, number>,
+  );
+}
 
 export const useGameStore = create<GameState>((set, get) => ({
   phase: "menu",
@@ -212,6 +254,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   upgrades: [],
   ammo: { ...DEFAULT_AMMO },
   cooldowns: { ...DEFAULT_COOLDOWN },
+  credits: 0,
+  ownedWeapons: [...DEFAULT_OWNED_WEAPONS],
+  loadout: [...DEFAULT_LOADOUT],
   threatCount: 3,
   threatsDestroyed: 0,
   activeTab: "WPN",
@@ -248,10 +293,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((s) => ({ explosions: s.explosions.filter((e) => e.id !== id) })),
   addUpgrade: (u) => set((s) => ({ upgrades: [...s.upgrades, u] })),
   resetCombat: () => {
-    const { upgrades } = get();
+    const { upgrades, loadout } = get();
     const ammoBoostCount = upgrades.filter((u) => u === "ammo-boost").length;
     const ammoBonus = ammoBoostCount * 3;
     const hasCityShield = upgrades.includes("city-shield");
+    const activeLoadout = loadout.length > 0 ? loadout : [...DEFAULT_LOADOUT];
     set({
       threats: [],
       missiles: [],
@@ -259,12 +305,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       shield: 100,
       hull: 100,
       targetLockId: null,
-      ammo: {
-        "heat-seeker": DEFAULT_AMMO["heat-seeker"] + ammoBonus,
-        cluster: DEFAULT_AMMO.cluster + ammoBonus,
-        "prox-burst": DEFAULT_AMMO["prox-burst"] + ammoBonus,
-        kinetic: DEFAULT_AMMO.kinetic + ammoBonus,
-      },
+      selectedWeapon: activeLoadout[0],
+      ammo: buildCombatAmmo(activeLoadout, ammoBonus),
       cooldowns: { ...DEFAULT_COOLDOWN },
       threatsDestroyed: 0,
       cameraShake: 0,
@@ -291,12 +333,30 @@ export const useGameStore = create<GameState>((set, get) => ({
       const raw = localStorage.getItem("aegis_save");
       if (raw) {
         const data = JSON.parse(raw);
+        // Sanitize persisted weapon ids against the current catalog so a stale
+        // save can never carry an unknown weapon into the store.
+        const owned: WeaponType[] = Array.isArray(data.ownedWeapons)
+          ? data.ownedWeapons.filter((w: WeaponType) =>
+              WEAPON_ORDER.includes(w),
+            )
+          : [...DEFAULT_OWNED_WEAPONS];
+        const ownedSet = new Set(owned);
+        const loadout: WeaponType[] = Array.isArray(data.loadout)
+          ? data.loadout
+              .filter(
+                (w: WeaponType) => WEAPON_ORDER.includes(w) && ownedSet.has(w),
+              )
+              .slice(0, MAX_LOADOUT)
+          : [...DEFAULT_LOADOUT];
         set({
           chapter: data.chapter ?? 1,
           score: data.score ?? 0,
           upgrades: data.upgrades ?? [],
           maxCombo: data.maxCombo ?? 0,
           nearMisses: data.nearMisses ?? 0,
+          credits: data.credits ?? 0,
+          ownedWeapons: owned.length > 0 ? owned : [...DEFAULT_OWNED_WEAPONS],
+          loadout: loadout.length > 0 ? loadout : [...DEFAULT_LOADOUT],
         });
       }
     } catch (_) {
@@ -304,22 +364,70 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
   saveToStorage: () => {
-    const { chapter, score, upgrades, maxCombo, nearMisses } = get();
+    const {
+      chapter,
+      score,
+      upgrades,
+      maxCombo,
+      nearMisses,
+      credits,
+      ownedWeapons,
+      loadout,
+    } = get();
     localStorage.setItem(
       "aegis_save",
-      JSON.stringify({ chapter, score, upgrades, maxCombo, nearMisses }),
+      JSON.stringify({
+        chapter,
+        score,
+        upgrades,
+        maxCombo,
+        nearMisses,
+        credits,
+        ownedWeapons,
+        loadout,
+      }),
     );
   },
   setAmmo: (weapon, amount) =>
     set((s) => ({ ammo: { ...s.ammo, [weapon]: amount } })),
   setCooldown: (weapon, readyAt) =>
     set((s) => ({ cooldowns: { ...s.cooldowns, [weapon]: readyAt } })),
+  addCredits: (n) => set((s) => ({ credits: s.credits + n })),
+  unlockWeapon: (weapon) => {
+    const { credits, ownedWeapons } = get();
+    if (ownedWeapons.includes(weapon)) return false;
+    const cost = WEAPONS[weapon].unlockCost;
+    if (credits < cost) return false;
+    set({
+      credits: credits - cost,
+      ownedWeapons: [...ownedWeapons, weapon],
+    });
+    return true;
+  },
+  toggleLoadout: (weapon) =>
+    set((s) => {
+      if (!s.ownedWeapons.includes(weapon)) return {};
+      if (s.loadout.includes(weapon)) {
+        // Keep at least one weapon equipped.
+        if (s.loadout.length <= 1) return {};
+        return { loadout: s.loadout.filter((w) => w !== weapon) };
+      }
+      if (s.loadout.length >= MAX_LOADOUT) return {};
+      // Preserve canonical catalog order for a stable HUD layout.
+      const next = [...s.loadout, weapon];
+      next.sort((a, b) => WEAPON_ORDER.indexOf(a) - WEAPON_ORDER.indexOf(b));
+      return { loadout: next };
+    }),
+  slowThreat: (id, factor) =>
+    set((s) => ({
+      threats: s.threats.map((t) =>
+        t.id === id ? { ...t, speed: t.speed * factor } : t,
+      ),
+    })),
   damageThreat: (id) =>
     set((s) => ({
       threats: s.threats
-        .map((t) =>
-          t.id === id ? { ...t, hp: t.hp - 1 } : t,
-        )
+        .map((t) => (t.id === id ? { ...t, hp: t.hp - 1 } : t))
         .filter((t) => t.hp > 0) as typeof s.threats,
     })),
   destroyCity: (id) =>
@@ -373,18 +481,34 @@ export const useGameStore = create<GameState>((set, get) => ({
     const target = threats.find((t) => t.id === targetLockId);
     if (!target) return false;
 
-    state.fireMissile({
-      id: `m_${Date.now()}`,
-      weaponType: selectedWeapon,
-      startPos: [0, 0, 4],
-      targetId: targetLockId,
-      targetPos: [...target.position] as [number, number, number],
-      progress: 0,
-    });
+    const def = WEAPONS[selectedWeapon];
+    const shots = Math.max(1, def.projectiles);
+    for (let i = 0; i < shots; i++) {
+      // Spread weapons fan their pellets out slightly around the target point.
+      const jitter = shots > 1 ? (i - (shots - 1) / 2) * 0.25 : 0;
+      const targetPos: [number, number, number] = [
+        target.position[0] + jitter,
+        target.position[1] + jitter * 0.5,
+        target.position[2],
+      ];
+      state.fireMissile({
+        id: `m_${Date.now()}_${i}`,
+        weaponType: selectedWeapon,
+        startPos: [0, 0, 4],
+        targetId: targetLockId,
+        targetPos,
+        progress: 0,
+      });
+    }
     state.setAmmo(selectedWeapon, ammo[selectedWeapon] - 1);
-    const reloadCount = state.upgrades.filter((u) => u === "rapid-reload").length;
+    const reloadCount = state.upgrades.filter(
+      (u) => u === "rapid-reload",
+    ).length;
     const reloadMult = 0.7 ** reloadCount;
-    state.setCooldown(selectedWeapon, now + WEAPON_COOLDOWNS[selectedWeapon] * reloadMult);
+    state.setCooldown(
+      selectedWeapon,
+      now + WEAPON_COOLDOWNS[selectedWeapon] * reloadMult,
+    );
     state.setCameraShake(3);
     state.setTargetLock(null);
     return true;

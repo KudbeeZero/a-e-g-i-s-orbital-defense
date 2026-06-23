@@ -9,15 +9,44 @@ live tracker (see decision D-004).
 
 ---
 
+## ✅ Recently shipped
+
+### Next-level graphics pass
+- **Bloom + tone mapping:** added `@react-three/postprocessing` (Bloom +
+  Vignette + combo-driven ChromaticAberration in `components/PostFX.tsx`),
+  ACESFilmic tone mapping, and a clamped DPR (`[1, 1.5]`) for a balanced perf
+  target.
+- **Earth overhaul:** 2048 textures with shared continent data driving a
+  bumpMap (relief), a roughnessMap (glossy oceans / matte land), a brighter
+  emissive night map, a sun-scatter atmosphere shader, and a banded procedural
+  cloud layer.
+- **Combat FX:** additive, brighter trails; tracers/explosions/lock-on visuals
+  set `toneMapped=false` so they bloom.
+- **Fonts:** real JetBrains Mono + Bricolage Grotesque via `@fontsource`
+  (was broken stubs) — see P0-4.
+
+### Weapon Stash + loadout (with unlocks)
+- A real **Armory** screen (own → unlock → equip) replaces the old static
+  weapon list on the menu. Players earn **credits** (per kill + a per-chapter
+  bonus), **unlock** new weapons, and pick a **loadout** (max 4) carried into
+  combat. Three new weapon types added: **RAILGUN**, **EMP PULSE**, **FLAK
+  SPREAD**.
+- All weapon data now lives in one catalog: `src/frontend/src/data/weapons.ts`
+  (was duplicated across the store, HUD selector, and menu). Stash state
+  (`credits`, `ownedWeapons`, `loadout`) persists in the `aegis_save` schema.
+- **Follow-up (P2):** bespoke per-weapon flight/explosion FX — the new types
+  currently reuse existing missile/blast visuals tinted by catalog color.
+
+---
+
 ## P0 — Foundations (do first)
 
-### P0-1 · Add CI quality gate (GitHub Actions)
-- **Status:** 🟡 partial — a **GitHub Pages deploy** workflow now exists
-  (`.github/workflows/deploy-pages.yml`); the **quality gate is still TODO**.
-- **Goal:** On every push/PR, run `pnpm typecheck` and Biome `pnpm check`; fail on errors.
-- **Acceptance:** A green/red check appears on PRs; broken types or lint fail the build.
-- **Bigger & better:** Per-PR **preview deploys** (Vercel/Netlify) on top of the Pages URL.
-- **Labels:** `infra`, `ci`. **Why:** nothing guards quality on push today.
+### P0-1 · Add CI quality gate (GitHub Actions) ✅ DONE
+- **Status:** ✅ done — `.github/workflows/ci.yml` runs typecheck + Biome on
+  every PR and non-`main` push; a green/red check now appears on PRs.
+- **Bigger & better (still open):** Per-PR **preview deploys** (Vercel/Netlify)
+  on top of the Pages URL; add Vitest to the gate once tests exist (P1-1).
+- **Labels:** `infra`, `ci`.
 
 ### P0-2 · Seed the backlog into GitHub Issues
 - **Goal:** Turn this file's items into labeled Issues with milestones.
@@ -34,13 +63,11 @@ live tracker (see decision D-004).
 
 ---
 
-### P0-4 · Restore real fonts + untrack stale `dist/`
-- **Goal:** The repo's `assets/fonts/*.woff2` are ≤214-byte stubs (no real fonts anywhere),
-  so the UI falls back to system fonts. Source/commit the real display fonts. Separately,
-  `src/frontend/dist/` is a tracked, stale build artifact (degraded base64 assets) — untrack
-  it and add to `.gitignore`.
-- **Acceptance:** Custom fonts render on the live site; `dist/` no longer tracked.
-- **Bigger & better:** Self-host fonts via a tiny `@font-face` manifest checked in CI.
+### P0-4 · Restore real fonts ✅ / untrack stale `dist/` ✅ DONE
+- **Status:** ✅ done — JetBrains Mono + Bricolage Grotesque now ship via
+  `@fontsource` packages (bundled + hashed by Vite), imported in `main.tsx`; the
+  broken `@font-face` stubs were removed. `src/frontend/dist/` is now untracked
+  and added to `.gitignore` (rebuilt by `deploy-pages.yml` in CI).
 - **Labels:** `assets`, `infra`. **Why:** found during the asset-wiring fix.
 
 ## P1 — Next
@@ -54,8 +81,24 @@ live tracker (see decision D-004).
 ### P1-2 · Real README + contributor docs
 - **Goal:** Replace the Caffeine stub with run/build/deploy/architecture docs (link `.aegis/`).
 - **Acceptance:** A new dev can clone, install, and run locally from the README alone.
+- **Local-dev quickstart to document** (verified working): `pnpm install` at the
+  repo root, then `cd src/frontend && pnpm dev` and open the printed
+  `localhost:5173`. No backend or accounts required — the game is fully
+  client-side. Build with `pnpm build`; quality gates are `pnpm typecheck` and
+  `pnpm check` (Biome).
 - **Bigger & better:** Animated GIF/short clip of gameplay in the README.
 - **Labels:** `docs`.
+
+### P1-5 · Adobe Firefly art generation pass
+- **Goal:** Use Adobe Firefly to generate higher-fidelity game art and commit it
+  into the repo: missile/explosion sprites (replace the `/assets/generated/*`
+  placeholders) and a real Earth surface/night texture to replace the
+  procedural canvas art in `EarthScene.tsx`.
+- **Acceptance:** New sprites/textures render in-game via the existing
+  `assets.ts` path constants; no external runtime fetch (assets are bundled).
+- **Bigger & better:** A small, repeatable "art kit" prompt set so new weapon
+  types (railgun/emp/flak) and threats can get matching bespoke sprites.
+- **Labels:** `assets`, `art`.
 
 ### P1-3 · Audio: music + SFX
 - **Goal:** Add background score + fire/explosion/impact SFX with a mute toggle.
@@ -91,6 +134,14 @@ live tracker (see decision D-004).
 - Opt-in anonymous gameplay metrics to inform balance.
 - **Bigger & better:** A live ops dashboard fed from the same Notion pipeline.
 - **Labels:** `infra`, `analytics`.
+
+### P2-5 · Bespoke new-weapon FX
+- **Goal:** Give RAILGUN / EMP PULSE / FLAK SPREAD their own flight paths and
+  explosion visuals in `EarthScene.tsx` (they currently reuse existing
+  missile/blast art tinted by catalog color). E.g. a straight tracer beam for
+  railgun, an expanding ion ring for EMP, a pellet burst for flak.
+- **Acceptance:** Each new weapon is visually distinct in combat.
+- **Labels:** `gameplay`, `art`. **Why:** follow-up from the weapon-stash ship.
 
 ---
 
