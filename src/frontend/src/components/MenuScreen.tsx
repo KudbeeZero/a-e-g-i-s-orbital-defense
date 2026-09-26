@@ -175,7 +175,9 @@ export default function MenuScreen() {
             onClick={handleLaunch}
             className="w-full py-4 font-hud font-bold text-lg tracking-[0.15em] border-2 transition-all duration-300 disabled:opacity-75 disabled:cursor-wait"
             style={{
-              background: isLoading ? "rgba(0,229,255,0.08)" : "rgba(0,229,255,0.1)",
+              background: isLoading
+                ? "rgba(0,229,255,0.08)"
+                : "rgba(0,229,255,0.1)",
               borderColor: "#00e5ff",
               color: "#00e5ff",
               boxShadow: isLoading
