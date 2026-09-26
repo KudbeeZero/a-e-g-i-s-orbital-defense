@@ -23,7 +23,21 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     sourcemap: false,
-    minify: false,
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ["three"],
+          react: ["react", "react-dom"],
+        },
+      },
+    },
   },
   css: {
     postcss: "./postcss.config.js",
