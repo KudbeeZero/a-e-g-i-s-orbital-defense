@@ -9,6 +9,7 @@ export default function MenuScreen() {
   const chapter = useGameStore((s) => s.chapter);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasSave, setHasSave] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const save = localStorage.getItem("aegis_save");
@@ -91,15 +92,21 @@ export default function MenuScreen() {
   }, []);
 
   const handleLaunch = () => {
-    resetCombat();
-    setChapter(1);
-    setPhase("cinematic");
+    setIsLoading(true);
+    requestAnimationFrame(() => {
+      resetCombat();
+      setChapter(1);
+      setPhase("cinematic");
+    });
   };
 
   const handleContinue = () => {
-    loadFromStorage();
-    resetCombat();
-    setPhase("cinematic");
+    setIsLoading(true);
+    requestAnimationFrame(() => {
+      loadFromStorage();
+      resetCombat();
+      setPhase("cinematic");
+    });
   };
 
   return (
@@ -125,13 +132,14 @@ export default function MenuScreen() {
           CLASSIFIED - ORBITAL DEFENSE NETWORK
         </div>
 
-        <div className="text-center">
+        <div className="text-center animate-fadeIn">
           <h1
             className="font-display font-black text-7xl sm:text-8xl md:text-9xl tracking-tighter leading-none"
             style={{
               color: "#00e5ff",
               textShadow:
                 "0 0 30px #00e5ff, 0 0 60px rgba(0,229,255,0.5), 0 0 100px rgba(0,229,255,0.2)",
+              animation: "glow 3s ease-in-out infinite",
             }}
           >
             A.E.G.I.S
@@ -162,28 +170,36 @@ export default function MenuScreen() {
         <div className="flex flex-col gap-3 w-full max-w-sm mt-4">
           <button
             type="button"
+            disabled={isLoading}
             data-ocid="menu.primary_button"
             onClick={handleLaunch}
-            className="w-full py-4 font-hud font-bold text-lg tracking-[0.15em] border-2 transition-all duration-200"
+            className="w-full py-4 font-hud font-bold text-lg tracking-[0.15em] border-2 transition-all duration-300 disabled:opacity-75 disabled:cursor-wait"
             style={{
-              background: "rgba(0,229,255,0.1)",
+              background: isLoading
+                ? "rgba(0,229,255,0.08)"
+                : "rgba(0,229,255,0.1)",
               borderColor: "#00e5ff",
               color: "#00e5ff",
-              boxShadow:
-                "0 0 12px rgba(0,229,255,0.3), inset 0 0 12px rgba(0,229,255,0.05)",
+              boxShadow: isLoading
+                ? "0 0 8px rgba(0,229,255,0.2)"
+                : "0 0 12px rgba(0,229,255,0.3), inset 0 0 12px rgba(0,229,255,0.05)",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(0,229,255,0.2)";
-              e.currentTarget.style.boxShadow =
-                "0 0 24px rgba(0,229,255,0.5), inset 0 0 16px rgba(0,229,255,0.1)";
+              if (!isLoading) {
+                e.currentTarget.style.background = "rgba(0,229,255,0.2)";
+                e.currentTarget.style.boxShadow =
+                  "0 0 24px rgba(0,229,255,0.5), inset 0 0 16px rgba(0,229,255,0.1)";
+              }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(0,229,255,0.1)";
-              e.currentTarget.style.boxShadow =
-                "0 0 12px rgba(0,229,255,0.3), inset 0 0 12px rgba(0,229,255,0.05)";
+              if (!isLoading) {
+                e.currentTarget.style.background = "rgba(0,229,255,0.1)";
+                e.currentTarget.style.boxShadow =
+                  "0 0 12px rgba(0,229,255,0.3), inset 0 0 12px rgba(0,229,255,0.05)";
+              }
             }}
           >
-            ⚡ LAUNCH CAMPAIGN
+            {isLoading ? "⏳ INITIALIZING..." : "⚡ LAUNCH CAMPAIGN"}
           </button>
 
           {hasSave && (

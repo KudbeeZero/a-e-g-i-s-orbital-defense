@@ -23,7 +23,25 @@ export default defineConfig({
   build: {
     emptyOutDir: true,
     sourcemap: false,
-    minify: false,
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Split large dependencies into separate chunks for better caching
+          if (id.includes("node_modules/three")) return "three";
+          if (id.includes("node_modules/react")) return "react";
+          if (id.includes("node_modules/@react-three")) return "r3f";
+          if (id.includes("node_modules/@radix-ui")) return "ui";
+          if (id.includes("node_modules/zustand")) return "store";
+        },
+      },
+    },
   },
   css: {
     postcss: "./postcss.config.js",
