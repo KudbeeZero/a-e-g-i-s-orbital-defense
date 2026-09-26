@@ -1,0 +1,37 @@
+{
+  "name": "AEGIS Orbital Defense",
+  "short_name": "AEGIS",
+  "description": "Real-time strategic space defense game. Protect Earth from incoming cosmic threats.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "categories": ["games"],
+  "screenshots": [
+    {
+      "src": "/assets/IMG_7185.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Ccircle cx='96' cy='96' r='90' fill='%230f172a' stroke='%2360a5fa' stroke-width='6'/%3E%3Ccircle cx='96' cy='96' r='70' fill='none' stroke='%2360a5fa' stroke-width='4' opacity='0.5'/%3E%3Ccircle cx='96' cy='96' r='6' fill='%2360a5fa'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Launch Game",
+      "short_name": "Play",
+      "description": "Launch AEGIS Orbital Defense campaign",
+      "url": "/?action=launch",
+      "icons": []
+    }
+  ]
+}

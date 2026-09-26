@@ -32,9 +32,13 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        manualChunks: {
-          three: ["three"],
-          react: ["react", "react-dom"],
+        manualChunks(id) {
+          // Split large dependencies into separate chunks for better caching
+          if (id.includes("node_modules/three")) return "three";
+          if (id.includes("node_modules/react")) return "react";
+          if (id.includes("node_modules/@react-three")) return "r3f";
+          if (id.includes("node_modules/@radix-ui")) return "ui";
+          if (id.includes("node_modules/zustand")) return "store";
         },
       },
     },
