@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect } from "react";
+import ErrorBoundary from "./components/ErrorBoundary";
 import LoadingScreen from "./components/LoadingScreen";
 import MenuScreen from "./components/MenuScreen";
 import { useGameStore } from "./store/gameStore";
@@ -21,14 +22,16 @@ export default function App() {
   // Menu screen doesn't need lazy loading - it's critical
   if (phase === "menu") return <MenuScreen />;
 
-  // All other screens lazy load with loading fallback
+  // All other screens lazy load with loading fallback, wrapped in error boundary
   return (
-    <Suspense fallback={<LoadingScreen />}>
-      {phase === "armory" && <ArmoryScreen />}
-      {phase === "cinematic" && <CinematicScreen />}
-      {phase === "combat" && <CombatScreen />}
-      {phase === "upgrade" && <UpgradeScreen />}
-      {phase === "gameover" && <ResultScreen />}
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingScreen />}>
+        {phase === "armory" && <ArmoryScreen />}
+        {phase === "cinematic" && <CinematicScreen />}
+        {phase === "combat" && <CombatScreen />}
+        {phase === "upgrade" && <UpgradeScreen />}
+        {phase === "gameover" && <ResultScreen />}
+      </Suspense>
+    </ErrorBoundary>
   );
 }
